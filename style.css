@@ -142,14 +142,14 @@ body::after {
   font-weight: 700;
   letter-spacing: .19em;
 }
-.eyebrow { margin: 0 0 9px; color: var(--pink-light); }
+.eyebrow { margin: 0 0 9px; color: var(--pink); }
 h1 {
   margin: 0;
   font-size: clamp(24px, 6.5vw, 32px);
   line-height: 1.12;
   letter-spacing: -.055em;
 }
-h1 span, .section-heading h2 span { color: var(--pink-light); }
+h1 span, .section-heading h2 span { color: var(--pink); }
 .intro {
   max-width: 350px;
   margin: 10px auto 0;
