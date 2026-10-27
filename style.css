@@ -175,13 +175,13 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
   box-shadow: 0 0 11px var(--pink);
 }
 
-/* Links principais: três colunas e duas linhas, em altura compacta */
+/* Links principais: atalhos ultracompactos */
 .links-section {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: 10px;
-  row-gap: 8px;
-  margin-top: 20px;
+  row-gap: 6px;
+  margin-top: 14px;
 }
 .links-section .section-label {
   display: flex;
@@ -200,13 +200,13 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 82px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 5px;
+  min-height: 42px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
   margin: 0;
-  padding: 8px 9px 7px;
+  padding: 5px 7px;
   overflow-wrap: anywhere;
   border: 1px solid #ffffff1f;
   border-radius: 15px;
@@ -230,43 +230,47 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
 }
 .link-icon {
   display: grid;
-  width: 27px;
-  height: 27px;
-  flex: 0 0 27px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   place-items: center;
   border: 1px solid #ff168b33;
-  border-radius: 10px;
+  border-radius: 7px;
   color: var(--pink-light);
   background: #ff168b1a;
-  font-size: 20px;
+  font-size: 14px;
 }
-.instagram-icon { font-size: 27px; }
+.instagram-icon { font-size: 19px; }
 .link-text {
   display: grid;
   width: 100%;
   min-width: 0;
-  gap: 3px;
+  gap: 0;
+  padding-right: 9px;
 }
 .link-text strong {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 .link-text small {
+  display: none;
   color: var(--muted);
   font-size: 10px;
   line-height: 1.45;
 }
 .arrow {
-  align-self: flex-end;
+  position: absolute;
+  top: 4px;
+  right: 5px;
   color: var(--pink-light);
   font-size: 16px;
   line-height: 1;
 }
 
 /* Carrossel do portfólio */
-.portfolio-section { margin-top: 24px; }
+.portfolio-section { margin-top: 16px; }
 .section-heading {
   display: flex;
   align-items: end;
@@ -393,16 +397,18 @@ footer small { color: #756772; font-size: 10px; }
 @media (min-width: 700px) {
   .page-shell { padding-top: 48px; padding-bottom: 40px; }
   .brand { padding: 32px 30px 25px; }
-  .portfolio-section { margin-top: 40px; }
+  .portfolio-section { margin-top: 24px; }
   .portfolio-image { height: 360px; }
   .carousel-caption { bottom: 32px; }
 }
 @media (max-width: 380px) {
   .page-shell { width: calc(100% - 24px); }
-  .links-section { column-gap: 7px; row-gap: 9px; }
-  .link-card { min-height: 84px; padding: 8px 7px 7px; }
-  .link-text strong { font-size: 10px; }
-  .link-text small { font-size: 9px; }
+  .links-section { column-gap: 6px; row-gap: 6px; }
+  .link-card { min-height: 40px; padding: 5px; gap: 5px; }
+  .link-icon { width: 18px; height: 18px; flex-basis: 18px; font-size: 12px; }
+  .instagram-icon { font-size: 17px; }
+  .link-text strong { font-size: 9px; line-height: 1.2; }
+  .link-text small { display: none; }
   .section-heading { align-items: center; }
   .carousel-arrow { width: 34px; height: 34px; }
   .carousel-caption p { font-size: 11px; }
