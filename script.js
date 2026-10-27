@@ -18,11 +18,11 @@ const HG3D_LINKS = {
   "site-whatsapp": `https://wa.me/${HG3D_PHONE}?text=${encodeURIComponent(SITE_MESSAGE)}`,
 
   // Troque SEUUSUARIO pelo nome real do perfil do Instagram.
-  instagram: "https://instagram.com/SEUUSUARIO",
+  instagram: "https://www.instagram.com/impressao3dhg/",
 
   // Substitua # pelos endereços reais quando tiver catálogo ou página informativa.
-  catalog: "#",
-  how: "#",
+  catalog: "https://www.instagram.com/impressao3dhg/",
+  how: "https://www.instagram.com/p/DewKzxLkfx1/?img_index=1",
 
   contact: `https://wa.me/${HG3D_PHONE}?text=${encodeURIComponent(
     "Olá! Gostaria de conhecer melhor o trabalho da HG 3D."
