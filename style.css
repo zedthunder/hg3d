@@ -116,26 +116,19 @@ body::after {
   border: 1px solid #ff168b29;
   box-shadow: 0 0 0 22px #ff168b08, 0 0 0 45px #ff168b05;
 }
-.brand-mark {
+.brand-logo-wrap {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 5px;
+  align-items: center;
   margin: 0 auto 15px;
-  font-size: clamp(42px, 11vw, 56px);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -5px;
+  width: 100%;
 }
-.mark-h, .mark-g { color: #fff; }
-.mark-divider {
-  width: 4px;
-  height: 41px;
-  margin: 0 10px 0 13px;
-  background: var(--pink);
-  box-shadow: 0 0 15px #ff168b70;
+.brand-logo {
+  display: block;
+  width: min(100%, 290px);
+  max-height: 125px;
+  object-fit: contain;
 }
-.mark-3d { font-size: .88em; letter-spacing: -4px; }
 
 .eyebrow, .section-label, .status-line {
   font-size: 11px;
@@ -405,8 +398,8 @@ footer small { color: #756772; font-size: 10px; }
 @media (max-width: 380px) {
   .page-shell { width: calc(100% - 24px); padding-top: 12px; }
   .brand { padding: 18px 15px 15px; }
-  .brand-mark { margin-bottom: 12px; font-size: 44px; }
-  .mark-divider { height: 37px; margin-right: 8px; margin-left: 10px; }
+  .brand-logo-wrap { margin-bottom: 12px; }
+  .brand-logo { width: min(100%, 250px); max-height: 105px; }
   .intro { font-size: 14px; }
   .status-line { margin-top: 12px; font-size: 9px; }
   .links-section { column-gap: 6px; row-gap: 6px; }
