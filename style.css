@@ -87,7 +87,7 @@ body::after {
   position: relative;
   width: min(100% - 32px, 510px);
   margin: auto;
-  padding: 30px 0 28px;
+  padding: 18px 0 24px;
 }
 
 .glass-panel {
@@ -102,7 +102,7 @@ body::after {
 .brand {
   position: relative;
   overflow: hidden;
-  padding: 27px 24px 22px;
+  padding: 20px 20px 17px;
   border-radius: 26px;
 }
 .brand::before {
@@ -121,8 +121,8 @@ body::after {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  margin: 1px auto 24px;
-  font-size: clamp(48px, 13vw, 66px);
+  margin: 0 auto 15px;
+  font-size: clamp(42px, 11vw, 56px);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -5px;
@@ -130,7 +130,7 @@ body::after {
 .mark-h, .mark-g { color: #fff; }
 .mark-divider {
   width: 4px;
-  height: 48px;
+  height: 41px;
   margin: 0 10px 0 13px;
   background: var(--pink);
   box-shadow: 0 0 15px #ff168b70;
@@ -138,33 +138,33 @@ body::after {
 .mark-3d { font-size: .88em; letter-spacing: -4px; }
 
 .eyebrow, .section-label, .status-line {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .19em;
 }
-.eyebrow { margin: 0 0 12px; color: var(--pink-light); }
+.eyebrow { margin: 0 0 9px; color: var(--pink-light); }
 h1 {
   margin: 0;
-  font-size: clamp(25px, 7vw, 34px);
+  font-size: clamp(24px, 6.5vw, 32px);
   line-height: 1.12;
   letter-spacing: -.055em;
 }
 h1 span, .section-heading h2 span { color: var(--pink-light); }
 .intro {
   max-width: 350px;
-  margin: 13px auto 0;
+  margin: 10px auto 0;
   color: #c8bac5;
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.55;
 }
 .status-line {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 23px;
+  margin-top: 15px;
   color: #9c8997;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: .14em;
 }
 .status-dot, .note-dot {
@@ -180,8 +180,8 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: 10px;
-  row-gap: 6px;
-  margin-top: 14px;
+  row-gap: 8px;
+  margin-top: 12px;
 }
 .links-section .section-label {
   display: flex;
@@ -200,13 +200,13 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 42px;
+  min-height: 54px;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
   gap: 7px;
   margin: 0;
-  padding: 5px 7px;
+  padding: 7px 7px;
   overflow-wrap: anywhere;
   border: 1px solid #ffffff1f;
   border-radius: 15px;
@@ -249,16 +249,16 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
   padding-right: 8px;
 }
 .link-text strong {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 .link-text small {
   display: block;
   color: var(--muted);
-  font-size: 8px;
-  line-height: 1.15;
+  font-size: 9.5px;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 .arrow {
@@ -271,13 +271,13 @@ h1 span, .section-heading h2 span { color: var(--pink-light); }
 }
 
 /* Carrossel do portfólio */
-.portfolio-section { margin-top: 16px; }
+.portfolio-section { margin-top: 20px; }
 .section-heading {
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 2px 15px;
+  margin: 0 2px 11px;
 }
 .section-heading h2 {
   margin: 0;
@@ -403,13 +403,18 @@ footer small { color: #756772; font-size: 10px; }
   .carousel-caption { bottom: 32px; }
 }
 @media (max-width: 380px) {
-  .page-shell { width: calc(100% - 24px); }
+  .page-shell { width: calc(100% - 24px); padding-top: 12px; }
+  .brand { padding: 18px 15px 15px; }
+  .brand-mark { margin-bottom: 12px; font-size: 44px; }
+  .mark-divider { height: 37px; margin-right: 8px; margin-left: 10px; }
+  .intro { font-size: 14px; }
+  .status-line { margin-top: 12px; font-size: 9px; }
   .links-section { column-gap: 6px; row-gap: 6px; }
-  .link-card { min-height: 42px; padding: 5px; gap: 5px; }
+  .link-card { min-height: 52px; padding: 6px; gap: 5px; }
   .link-icon { width: 18px; height: 18px; flex-basis: 18px; font-size: 12px; }
   .instagram-icon { font-size: 17px; }
-  .link-text strong { font-size: 8.5px; line-height: 1.1; }
-  .link-text small { display: block; font-size: 7.5px; line-height: 1.1; }
+  .link-text strong { font-size: 10px; line-height: 1.15; }
+  .link-text small { display: block; font-size: 9px; line-height: 1.15; }
   .section-heading { align-items: center; }
   .carousel-arrow { width: 34px; height: 34px; }
   .carousel-caption p { font-size: 11px; }
