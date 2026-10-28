@@ -21,7 +21,7 @@ const HG3D_LINKS = {
   instagram: "https://www.instagram.com/impressao3dhg/",
 
   // Substitua # pelos endereços reais quando tiver catálogo ou página informativa.
-  catalog: "https://www.instagram.com/impressao3dhg/",
+  catalog: "catalogo.html",
   how: "https://www.instagram.com/p/DewKzxLkfx1/?img_index=1",
 
   contact: `https://wa.me/${HG3D_PHONE}?text=${encodeURIComponent(
