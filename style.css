@@ -229,7 +229,7 @@ h1 span, .section-heading h2 span { color: var(--pink); }
   place-items: center;
   border: 1px solid #ff168b33;
   border-radius: 7px;
-  color: var(--pink-light);
+  color: var(--pink);
   background: #ff168b1a;
   font-size: 14px;
 }
