@@ -425,3 +425,17 @@ footer small { color: #756772; font-size: 10px; }
     scroll-behavior: auto !important;
   }
 }
+
+/* Centraliza os ícones dentro de suas próprias caixas */
+.link-card { align-items: center; }
+.link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.link-icon i {
+  display: block;
+  line-height: 1;
+}
