@@ -3,7 +3,7 @@
 // Altere os endereços abaixo para personalizar o site.
 // ==================================================
 
-const HG3D_PHONE = "5594992083131";
+const HG3D_PHONE = "5594991153003";
 
 // Mensagem para empresas interessadas em uma página própria.
 const SITE_MESSAGE =
