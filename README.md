@@ -1,6 +1,6 @@
 # HG 3D | Link na Bio
 
-Página responsiva de links para a HG 3D, com identidade preta e magenta, glassmorfismo e carrossel de fotos de impressões 3D.
+Página responsiva de links para a HG 3D, com identidade preta e verde neon, glassmorfismo e carrossel de fotos de impressões 3D.
 
 ## Publicação
 No GitHub, acesse Settings → Pages, selecione Deploy from a branch, branch `main` e pasta `/ (root)`.

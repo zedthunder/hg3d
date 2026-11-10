@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>HG Gestão</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2339ff14'/%3E%3Cpath d='M7 9v14M15 9v14M7 16h8' stroke='%23041a06' stroke-width='3'/%3E%3Cpath d='M26 12a5 5 0 0 0-4-3c-3 0-4 3-4 7s1 7 4 7c3 0 4-2 4-6h-4' fill='none' stroke='%23041a06' stroke-width='3'/%3E%3C/svg%3E">
+<script>
+  /* Aplica o tema salvo antes de desenhar a página, para não piscar. */
+  try {
+    const t = localStorage.getItem('hg-gestao-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Fundo: brilhos verdes que aparecem através dos painéis de vidro -->
+<div class="ambient ambient-one" aria-hidden="true"></div>
+<div class="ambient ambient-two" aria-hidden="true"></div>
+
+<!-- Entrada na conta (só quando o app abre pelo site) -->
+<section id="login-view" class="login-view" hidden>
+  <form id="login-form" class="login-card panel" novalidate>
+    <div class="login-brand"><span class="brand-mark">HG</span><span class="brand-name">HG Gestão</span></div>
+    <div id="login-loading" class="login-loading" hidden><span class="spinner" aria-hidden="true"></span><span id="login-loading-text">Carregando…</span></div>
+    <div id="login-fields">
+      <h1>Entrar</h1>
+      <p class="sub">Seus orçamentos e pedidos em qualquer aparelho.</p>
+      <label class="field"><span>E-mail</span><input id="login-email" type="email" autocomplete="username" required></label>
+      <label class="field"><span>Senha</span><input id="login-password" type="password" autocomplete="current-password" required></label>
+      <p id="login-error" class="login-error" role="alert" hidden></p>
+      <button type="submit" id="login-submit" class="btn btn-primary btn-lg btn-block">Entrar</button>
+      <button type="button" class="btn-link login-forgot" data-action="forgot-password">Esqueci minha senha</button>
+    </div>
+  </form>
+</section>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4V4h11v1"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-7h8v7"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10l7 3 3 7zM10 13l11-10"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 16V5M7 9l5-5 5 5M5 20h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-dash" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="9" rx="1"/><rect x="13" y="4" width="7" height="5" rx="1"/><rect x="13" y="11" width="7" height="9" rx="1"/><rect x="4" y="15" width="7" height="5" rx="1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4 9h11a5 5 0 0 1 0 10h-4M8 5 4 9l4 4"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <a class="brand" href="#" data-action="tab" data-tab="dashboard" aria-label="HG Gestão, ir para o dashboard">
+    <span class="brand-mark">HG</span>
+    <span class="brand-name">HG Gestão</span>
+  </a>
+  <nav class="tabs" aria-label="Seções">
+    <button class="tab" data-action="tab" data-tab="dashboard"><svg class="ic"><use href="#i-dash"/></svg>Dashboard</button>
+    <button class="tab" data-action="tab" data-tab="calc"><svg class="ic"><use href="#i-calc"/></svg>Calculadora</button>
+    <button class="tab" data-action="tab" data-tab="history"><svg class="ic"><use href="#i-history"/></svg>Histórico</button>
+    <button class="tab" data-action="tab" data-tab="stock"><svg class="ic"><use href="#i-box"/></svg>Estoque</button>
+    <button class="tab" data-action="tab" data-tab="settings"><svg class="ic"><use href="#i-gear"/></svg>Ajustes</button>
+  </nav>
+  <span id="sync-status" class="sync-status" role="status" hidden></span>
+  <button class="theme-toggle" data-action="theme-toggle" title="Trocar tema claro/escuro" aria-label="Trocar tema claro/escuro">
+    <svg class="ic when-light" aria-hidden="true"><use href="#i-moon"/></svg>
+    <svg class="ic when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
+  </button>
+</header>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="view-dashboard" class="view" hidden>
+    <div class="view-head">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="month-nav">
+          <button class="icon-btn" data-action="month-prev" aria-label="Mês anterior" title="Mês anterior"><svg class="ic"><use href="#i-prev"/></svg></button>
+          <span id="dash-month" class="month-label" aria-live="polite"></span>
+          <button class="icon-btn" id="month-next" data-action="month-next" aria-label="Próximo mês" title="Próximo mês"><svg class="ic"><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" data-action="tab" data-tab="calc"><svg class="ic"><use href="#i-plus"/></svg>Novo orçamento</button></div>
+    </div>
+    <div id="dash-kpis" class="kpis kpis-4"></div>
+    <div class="dash-grid">
+      <section id="dash-orders" class="panel" aria-label="Pedidos aprovados no mês"></section>
+      <div class="dash-side">
+        <section id="dash-goals" class="panel" aria-label="Metas"></section>
+        <section id="dash-last" class="panel" aria-label="Último orçamento"></section>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALCULADORA -->
+  <section id="view-calc" class="view calc-grid">
+    <form id="item-form" class="panel form-panel" autocomplete="off" onsubmit="return false">
+      <div class="panel-head">
+        <h2 id="form-title">Novo item</h2>
+        <button type="button" class="icon-btn" data-action="reset-form" title="Limpar formulário" aria-label="Limpar formulário"><svg class="ic"><use href="#i-trash"/></svg></button>
+      </div>
+
+      <div class="row row-name">
+        <label class="field"><span>Nome do item</span><input data-f="name" type="text" placeholder="Ex.: Vaso geométrico"></label>
+        <label class="field"><span id="qty-label">Qtd.</span><input data-f="qty" type="number" min="1" step="1" inputmode="numeric"></label>
+      </div>
+
+      <div class="segmented" role="group" aria-label="Como este item é produzido">
+        <button type="button" class="seg" data-action="mode" data-mode="simple">Lote único</button>
+        <button type="button" class="seg" data-action="mode" data-mode="plates">Por mesas e cores</button>
+      </div>
+
+      <div id="simple-fields">
+        <div class="slicer">
+          <div class="row">
+            <label class="field"><span>Peso total (g)</span><input data-f="grams" type="text" inputmode="decimal" placeholder="0"></label>
+            <label class="field"><span>Tempo total</span><input data-f="time" type="text" placeholder="0:00"></label>
+          </div>
+          <p class="hint">Valores do lote inteiro, como aparecem no fatiador. Tempo aceita 5:30, 5,5 ou 5h 30m.</p>
+        </div>
+
+        <div class="field">
+          <span id="cost-label">Custo do material (por kg)</span>
+          <div class="chips" id="material-presets" role="group" aria-labelledby="cost-label"></div>
+          <div class="with-unit"><span class="unit cur"></span><input id="cost-input" data-f="costKg" type="text" inputmode="decimal" aria-labelledby="cost-label"></div>
+          <div id="spool-badge" class="spool-badge" hidden></div>
+        </div>
+
+        <label class="switch"><input data-f="multi" type="checkbox"><span class="track"></span>Multi-material (AMS/MMU)</label>
+        <div id="multi-fields" class="row" hidden>
+          <label class="field"><span>Peso do 2º material (g)</span><input data-f="grams2" type="text" inputmode="decimal" placeholder="0"></label>
+          <label class="field"><span>Custo do 2º material (kg)</span><input data-f="costKg2" type="text" inputmode="decimal"></label>
+        </div>
+      </div>
+
+      <div id="plates-fields" hidden>
+        <div class="slicer">
+          <label class="field"><span>Peças por mesa</span><input data-f="capacity" type="number" min="1" step="1" inputmode="numeric" placeholder="Ex.: 16"></label>
+          <p id="plate-calc" class="plate-calc" hidden></p>
+          <p class="hint">Em cada cor, informe peso e tempo de uma mesa cheia, como no fatiador.</p>
+        </div>
+        <div id="color-list" class="color-list"></div>
+        <button type="button" class="btn btn-sm btn-block add-color" data-action="color-add"><svg class="ic"><use href="#i-plus"/></svg>Adicionar cor</button>
+        <label class="switch"><input data-f="fullPlates" type="checkbox"><span class="track"></span>Cobrar a última mesa como inteira</label>
+        <label class="field"><span>Acessórios por peça (argola, ímã...)</span><div class="with-unit"><span class="unit cur"></span><input data-f="perPiece" type="text" inputmode="decimal" placeholder="0"></div></label>
+      </div>
+
+      <label class="field"><span>Tempo de acabamento</span><input data-f="laborTime" type="text" placeholder="0:00"></label>
+      <p class="hint hint-tight">Horas lixando ou pintando. O valor da hora fica em Ajustes.</p>
+
+      <div class="row">
+        <label class="field"><span>Outros custos</span><div class="with-unit"><span class="unit cur"></span><input data-f="others" type="text" inputmode="decimal" placeholder="0"></div></label>
+        <label class="field"><span>Embalagem</span><div class="with-unit"><span class="unit cur"></span><input data-f="pack" type="text" inputmode="decimal" placeholder="0"></div></label>
+      </div>
+
+      <div class="field">
+        <div class="slider-head"><label for="risk">Risco de falha</label><output id="risk-out"></output></div>
+        <input id="risk" data-f="risk" type="range" min="0" max="50" step="1">
+      </div>
+
+      <div class="field">
+        <div class="slider-head">
+          <label for="margin">Lucro desejado</label>
+          <span class="pct-input"><input id="margin-field" type="text" inputmode="decimal" aria-label="Lucro desejado em porcentagem"><span>%</span></span>
+        </div>
+        <input id="margin" type="range" min="0" max="500" step="1">
+        <p class="hint">O slider vai até 500%; no campo vale qualquer valor.</p>
+      </div>
+
+      <label class="field field-last"><span>Preço fechado do item (opcional)</span><div class="with-unit"><span class="unit cur"></span><input data-f="fixedPrice" type="text" inputmode="decimal" placeholder="Calculado pelo lucro"></div></label>
+      <p class="hint">Abaixo do preço calculado, a diferença aparece como desconto no orçamento.</p>
+    </form>
+
+    <section id="result-panel" class="panel result-panel" aria-live="polite"></section>
+    <aside id="order-panel" class="panel order-panel" aria-label="Pedido atual"></aside>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section id="view-history" class="view" hidden>
+    <div class="view-head">
+      <div><h1>Histórico</h1><p class="sub">Orçamentos e pedidos salvos, com os custos guardados.</p></div>
+      <div class="actions">
+        <button class="btn" data-action="history-csv"><svg class="ic"><use href="#i-down"/></svg>Exportar CSV</button>
+        <button class="btn btn-danger" data-action="history-clear"><svg class="ic"><use href="#i-trash"/></svg>Limpar</button>
+      </div>
+    </div>
+    <div id="history-body"></div>
+  </section>
+
+  <!-- ESTOQUE -->
+  <section id="view-stock" class="view" hidden>
+    <div class="view-head">
+      <div><h1>Estoque</h1><p class="sub">Carretéis usados nos itens têm o peso descontado quando o pedido é aprovado.</p></div>
+      <div class="actions"><button class="btn btn-primary" data-action="spool-new"><svg class="ic"><use href="#i-plus"/></svg>Novo carretel</button></div>
+    </div>
+    <div id="stock-body"></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section id="view-settings" class="view view-narrow" hidden>
+    <div class="view-head"><div><h1>Ajustes</h1><p class="sub">Perfil do orçamento, máquina e parâmetros de negócio.</p></div></div>
+
+    <form id="profile-form" class="panel settings-card" autocomplete="off" onsubmit="return false">
+      <div class="panel-head"><div><h2>Perfil do orçamento</h2><p class="sub">Estes dados aparecem no cabeçalho e no rodapé de todo orçamento.</p></div></div>
+      <div class="profile-grid">
+        <div class="logo-box">
+          <div id="logo-preview" class="logo-preview"></div>
+          <div class="logo-actions">
+            <label class="btn btn-sm"><svg class="ic"><use href="#i-up"/></svg>Enviar logo<input id="logo-input" type="file" accept="image/png,image/jpeg,image/webp" class="visually-hidden"></label>
+            <button type="button" id="logo-remove" class="btn btn-sm" data-action="logo-remove">Remover</button>
+          </div>
+        </div>
+        <div class="profile-fields">
+          <label class="field"><span>Nome da empresa ou profissional</span><input data-p="name" type="text" placeholder="Ex.: HG 3D Workstation"></label>
+          <div class="row">
+            <label class="field"><span>CNPJ ou CPF</span><input data-p="doc" type="text"></label>
+            <label class="field"><span>Telefone / WhatsApp</span><input data-p="phone" type="tel"></label>
+          </div>
+          <div class="row">
+            <label class="field"><span>E-mail</span><input data-p="email" type="email"></label>
+            <label class="field"><span>Site ou Instagram</span><input data-p="site" type="text"></label>
+          </div>
+          <label class="field"><span>Endereço</span><input data-p="address" type="text"></label>
+        </div>
+      </div>
+      <div class="row row-terms">
+        <label class="field"><span>Validade (dias)</span><input data-p="validityDays" type="number" min="0" step="1"></label>
+        <label class="field"><span>Condições de pagamento</span><input data-p="payment" type="text" placeholder="Ex.: Pix ou cartão, 50% na aprovação"></label>
+      </div>
+      <label class="field"><span>Observações padrão</span><textarea data-p="footer" rows="2" placeholder="Ex.: Prazo de produção combinado após a aprovação."></textarea></label>
+      <div class="preview-label">Prévia do cabeçalho</div>
+      <div id="profile-preview" class="paper paper-preview"></div>
+    </form>
+
+    <form id="settings-form" class="panel settings-card" autocomplete="off" onsubmit="return false">
+      <div class="panel-head wrap"><h2>Perfil da máquina</h2><div class="chips" id="printer-presets"></div></div>
+      <div class="row">
+        <label class="field"><span>Consumo (watts)</span><input data-s="watts" type="text" inputmode="decimal"></label>
+        <label class="field"><span>Custo da energia (kWh)</span><div class="with-unit"><span class="unit cur"></span><input data-s="kwh" type="text" inputmode="decimal"></div></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Preço da máquina</span><div class="with-unit"><span class="unit cur"></span><input data-s="printerPrice" type="text" inputmode="decimal"></div></label>
+        <label class="field"><span>Vida útil (horas)</span><input data-s="lifeHours" type="text" inputmode="decimal"></label>
+      </div>
+    </form>
+
+    <form class="panel settings-card" autocomplete="off" onsubmit="return false">
+      <div class="panel-head"><h2>Parâmetros de negócio</h2></div>
+      <div class="row">
+        <label class="field"><span>Custo padrão do material (kg)</span><div class="with-unit"><span class="unit cur"></span><input data-s="defaultCostKg" type="text" inputmode="decimal"></div></label>
+        <label class="field"><span>Mão de obra (por hora)</span><div class="with-unit"><span class="unit cur"></span><input data-s="laborRate" type="text" inputmode="decimal"></div></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Lucro mínimo por item</span><div class="with-unit"><span class="unit cur"></span><input data-s="minProfit" type="text" inputmode="decimal"></div></label>
+        <label class="field"><span>Moeda exibida</span>
+          <select id="currency"><option value="BRL">Real (R$)</option><option value="USD">Dólar (US$)</option><option value="EUR">Euro (€)</option></select>
+        </label>
+      </div>
+      <p class="hint">Se a margem render menos que o lucro mínimo, vale o mínimo. A moeda só troca o símbolo, sem converter valores.</p>
+    </form>
+
+    <div class="panel settings-card">
+      <div class="panel-head"><div><h2>Aparência</h2><p class="sub">Vale só para este navegador.</p></div></div>
+      <label class="field field-last"><span>Tema</span>
+        <select id="theme-select"><option value="auto">Automático (igual ao sistema)</option><option value="light">Claro</option><option value="dark">Escuro</option></select>
+      </label>
+    </div>
+
+    <div id="account-card" class="panel settings-card"></div>
+
+    <div class="panel settings-card">
+      <div class="panel-head"><div><h2>Segurança de dados</h2><p class="sub" id="backup-sub">Tudo fica salvo só neste navegador. Faça backup para não perder.</p></div></div>
+      <div class="actions">
+        <button class="btn" data-action="backup"><svg class="ic"><use href="#i-down"/></svg>Baixar backup</button>
+        <label class="btn"><svg class="ic"><use href="#i-up"/></svg>Restaurar backup<input id="restore-input" type="file" accept="application/json,.json" class="visually-hidden"></label>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Prévia do orçamento -->
+<dialog id="quote-dialog" class="quote-dialog" aria-label="Orçamento">
+  <div class="quote-toolbar">
+    <strong id="quote-title">Prévia do orçamento</strong>
+    <div class="actions">
+      <button class="btn btn-primary" data-action="print"><svg class="ic"><use href="#i-file"/></svg>Imprimir / Salvar PDF</button>
+      <button class="btn" data-action="close-dialog"><svg class="ic"><use href="#i-x"/></svg>Fechar</button>
+    </div>
+  </div>
+  <div id="quote-warning" class="quote-warning" hidden></div>
+  <article id="quote-paper" class="paper"></article>
+</dialog>
+
+<!-- Selecionar carretel -->
+<dialog id="spool-picker" class="modal" aria-labelledby="picker-title">
+  <div class="panel-head"><h2 id="picker-title">Usar do estoque</h2><button class="icon-btn" data-action="close-dialog" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div id="spool-picker-list" class="picker-list"></div>
+</dialog>
+
+<!-- Cadastro de carretel -->
+<dialog id="spool-dialog" class="modal" aria-labelledby="spool-title">
+  <form id="spool-form">
+    <div class="panel-head"><h2 id="spool-title">Novo carretel</h2><button type="button" class="icon-btn" data-action="close-dialog" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="row">
+      <label class="field"><span>Marca</span><input name="brand" type="text" required></label>
+      <label class="field"><span>Material</span><input name="material" type="text" required placeholder="PLA, PETG..."></label>
+    </div>
+    <div class="row row-color">
+      <label class="field"><span>Nome da cor</span><input name="colorName" type="text"></label>
+      <label class="field"><span>Cor</span><input name="colorHex" type="color" value="#39ff14"></label>
+    </div>
+    <div class="row">
+      <label class="field"><span>Peso inicial (g)</span><input name="weightInitial" type="text" inputmode="decimal" required value="1000"></label>
+      <label class="field"><span>Peso atual (g)</span><input name="weightCurrent" type="text" inputmode="decimal" required value="1000"></label>
+    </div>
+    <label class="field"><span>Preço pago no carretel</span><div class="with-unit"><span class="unit cur"></span><input name="price" type="text" inputmode="decimal" required></div></label>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-action="close-dialog">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Salvar carretel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Cadastro de meta -->
+<dialog id="goal-dialog" class="modal" aria-labelledby="goal-title">
+  <form id="goal-form">
+    <div class="panel-head"><h2 id="goal-title">Nova meta</h2><button type="button" class="icon-btn" data-action="close-dialog" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <label class="field"><span>Nome da meta</span><input name="name" type="text" required placeholder="Ex.: Pagar a impressora"></label>
+    <div class="row">
+      <label class="field"><span>O que medir</span><select name="metric"><option value="profit">Lucro</option><option value="sales">Vendas</option></select></label>
+      <label class="field"><span>Valor da meta</span><div class="with-unit"><span class="unit cur"></span><input name="target" type="text" inputmode="decimal" required></div></label>
+    </div>
+    <label class="field"><span>Período</span><select name="period"><option value="all">Acumulada: soma todos os pedidos</option><option value="month">Mensal: recomeça a cada mês</option></select></label>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-action="close-dialog">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Salvar meta</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

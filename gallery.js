@@ -37,15 +37,22 @@ async function loadGallery() {
       image.loading = "lazy";
       image.decoding = "async";
 
-      const caption = document.createElement("span");
-      caption.className = "gallery-caption";
-      caption.textContent = image.alt;
-
       const hint = document.createElement("span");
       hint.className = "gallery-zoom-hint";
       hint.innerHTML = '<i class="bi bi-arrows-angle-expand" aria-hidden="true"></i>';
 
-      card.append(image, caption, hint);
+      // Nome gerado pelo celular (só letras e números aleatórios) não vira legenda.
+      // Para ter legenda, nomeie o arquivo, por exemplo: chaveiro-personalizado.jpg
+      const autoName = /^[0-9a-f]{6,}([ -][0-9a-f]{3,})*$/i.test(image.alt) || /^(img|dsc|pxl|whatsapp image)[ _-]?\d/i.test(image.alt);
+      if (autoName) {
+        image.alt = "Criação HG 3D";
+        card.append(image, hint);
+      } else {
+        const caption = document.createElement("span");
+        caption.className = "gallery-caption";
+        caption.textContent = image.alt;
+        card.append(image, caption, hint);
+      }
       card.addEventListener("click", () => toggleImage(card));
       fragment.append(card);
     }
