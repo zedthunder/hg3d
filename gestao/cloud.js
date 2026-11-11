@@ -7,7 +7,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, collection, onSnapshot, setDoc, deleteDoc, terminate, clearIndexedDbPersistence,
+  doc, collection, onSnapshot, getDoc, setDoc, deleteDoc, terminate, clearIndexedDbPersistence,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -57,6 +57,13 @@ window.HGCloud = {
   writeMeta: (uid, data) => setDoc(metaRef(uid), data),
   writeOrder: (uid, order) => setDoc(doc(ordersRef(uid), order.id), order),
   deleteOrder: (uid, id) => deleteDoc(doc(ordersRef(uid), id)),
+
+  /* Dados só da conta, fora do backup (ex.: o token do GitHub da galeria). */
+  async readPrivate(uid, key) {
+    const snap = await getDoc(doc(db, 'users', uid, 'private', key));
+    return snap.exists() ? snap.data() : null;
+  },
+  writePrivate: (uid, key, data) => setDoc(doc(db, 'users', uid, 'private', key), data),
 };
 
 window.dispatchEvent(new Event('hgcloud-ready'));

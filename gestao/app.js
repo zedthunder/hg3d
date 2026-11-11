@@ -152,6 +152,7 @@
     if (tab === 'history') renderHistory();
     if (tab === 'stock') renderStock();
     if (tab === 'settings') fillSettings();
+    if (tab === 'gallery') openGallery();
     window.scrollTo(0, 0);
   }
 
@@ -1226,6 +1227,10 @@
     },
     backup: exportBackup,
     'sign-out': signOutFlow,
+    'gh-save': saveGithubToken,
+    'gh-forget': forgetGithubToken,
+    'gh-reload': () => loadPhotos(),
+    'photo-del': (b) => deletePhoto(b.dataset.name),
     'forgot-password': forgotPassword,
   };
 
@@ -1304,6 +1309,10 @@
       } catch (err) {
         toast('Não foi possível ler esta imagem.', 'error');
       }
+      el.value = '';
+    }
+    if (el.id === 'photo-input' && el.files.length) {
+      uploadPhotos([...el.files]);
       el.value = '';
     }
     if (el.id === 'restore-input' && el.files[0]) {
@@ -1554,6 +1563,7 @@
     $('#login-view').hidden = true;
     renderAccount();
     renderSync();
+    loadGithubToken();
   }
 
   const LOGIN_ERRORS = {
@@ -1591,7 +1601,7 @@
   async function signOutFlow() {
     if (!confirm('Sair da conta neste aparelho? Os dados continuam salvos na nuvem.')) return;
     try { await window.HGCloud.signOut(); } catch (err) { /* recarrega mesmo assim */ }
-    try { localStorage.removeItem(storageKey); } catch (err) { /* nada a limpar */ }
+    try { localStorage.removeItem(storageKey); localStorage.removeItem(GH_TOKEN_KEY); } catch (err) { /* nada a limpar */ }
     location.reload();
   }
 
@@ -1607,6 +1617,271 @@
   }
 
   $('#login-form').addEventListener('submit', submitLogin);
+
+  /* ---------- galeria do site (fotos na pasta gallery do GitHub) ----------
+     O app grava as fotos direto no repositório do site usando um token do GitHub
+     que só pode mexer no repositório hg3d. O token fica na conta (nuvem) e no aparelho. */
+  const GH = { owner: 'zedthunder', repo: 'hg3d', branch: 'main', dir: 'gallery' };
+  const GH_API = `https://api.github.com/repos/${GH.owner}/${GH.repo}`;
+  const GH_TOKEN_KEY = 'hg-gestao-github';
+  const IMAGE_FILE = /\.(avif|gif|jpe?g|png|webp)$/i;
+  const gallery = { token: '', photos: null, loading: false, busy: '', error: '' };
+  try { gallery.token = localStorage.getItem(GH_TOKEN_KEY) || ''; } catch (err) { /* sem armazenamento */ }
+
+  async function gh(path, opts = {}) {
+    let res;
+    try {
+      res = await fetch(GH_API + path, {
+        ...opts,
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${gallery.token}`,
+          ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+        },
+      });
+    } catch (err) {
+      const e = new Error('rede'); e.status = 0; throw e;
+    }
+    if (!res.ok) { const e = new Error(`GitHub ${res.status}`); e.status = res.status; throw e; }
+    return res.status === 204 ? null : res.json();
+  }
+
+  function ghErrorText(err) {
+    if (err.status === 0) return 'Sem conexão com o GitHub. Confira a internet.';
+    if (err.status === 401) return 'O token do GitHub é inválido ou venceu. Crie um novo e salve aqui.';
+    if (err.status === 403 || err.status === 404) return 'O token não tem permissão para gravar no repositório hg3d. Confira o passo 4.';
+    if (err.status === 409 || err.status === 422) return 'O site mudou enquanto as fotos eram enviadas. Tente de novo.';
+    return `O GitHub recusou o pedido (erro ${err.status}).`;
+  }
+
+  function storeToken(token) {
+    gallery.token = token;
+    try {
+      if (token) localStorage.setItem(GH_TOKEN_KEY, token); else localStorage.removeItem(GH_TOKEN_KEY);
+    } catch (err) { /* sem armazenamento */ }
+  }
+
+  /* Ao entrar na conta, traz o token salvo por outro aparelho. */
+  async function loadGithubToken() {
+    if (!cloud.on || !cloud.user || gallery.token) return;
+    try {
+      const data = await window.HGCloud.readPrivate(cloud.user.uid, 'github');
+      if (data && data.token && !gallery.token) {
+        storeToken(data.token);
+        if (state.tab === 'gallery') openGallery();
+      }
+    } catch (err) { /* segue sem token */ }
+  }
+
+  async function saveGithubToken() {
+    const input = $('#gh-token');
+    const token = input.value.trim();
+    if (!token) return toast('Cole o token do GitHub no campo.', 'error');
+    if (!/^(github_pat_|ghp_)\w+$/.test(token)) return toast('Isso não parece um token do GitHub. Ele começa com github_pat_.', 'error');
+    const previous = gallery.token;
+    gallery.token = token;
+    gallery.busy = 'Conferindo o token…';
+    renderGallery();
+    try {
+      await gh('');
+      storeToken(token);
+      if (cloud.on && cloud.user) {
+        window.HGCloud.writePrivate(cloud.user.uid, 'github', { token }).catch(syncError);
+      }
+      toast('Token salvo. Já pode enviar fotos.');
+      gallery.photos = null;
+    } catch (err) {
+      gallery.token = previous;
+      toast(ghErrorText(err), 'error');
+    }
+    gallery.busy = '';
+    openGallery();
+  }
+
+  function forgetGithubToken() {
+    if (!confirm('Remover o token do GitHub? Para enviar fotos de novo, vai precisar colar um token.')) return;
+    storeToken('');
+    if (cloud.on && cloud.user) window.HGCloud.writePrivate(cloud.user.uid, 'github', { token: '' }).catch(syncError);
+    gallery.photos = null;
+    renderGallery();
+  }
+
+  function openGallery() {
+    renderGallery();
+    if (gallery.token && gallery.photos === null && !gallery.loading) loadPhotos();
+  }
+
+  async function loadPhotos() {
+    gallery.loading = true;
+    gallery.error = '';
+    renderGallery();
+    try {
+      const files = await gh(`/contents/${GH.dir}?ref=${GH.branch}`).catch((err) => {
+        if (err.status === 404) return []; // pasta ainda não existe
+        throw err;
+      });
+      gallery.photos = files
+        .filter((f) => f.type === 'file' && IMAGE_FILE.test(f.name))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
+    } catch (err) {
+      gallery.error = ghErrorText(err);
+    }
+    gallery.loading = false;
+    renderGallery();
+  }
+
+  /* Mesma regra do site: nome gerado pelo celular não vira legenda. */
+  const photoCaption = (name) => {
+    const alt = name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+    const auto = /^[0-9a-f]{6,}([ -][0-9a-f]{3,})*$/i.test(alt) || /^(img|dsc|pxl|whatsapp image)[ _-]?\d/i.test(alt);
+    return auto ? '' : alt;
+  };
+
+  /* "Chaveiro do Naruto!" vira "Chaveiro-do-Naruto". Mantém acentos para a legenda. */
+  const photoSlug = (text) => text.normalize('NFC').trim()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+
+  function renderGallery() {
+    const el = $('#gallery-body');
+    if (!el) return;
+    if (!gallery.token) {
+      el.innerHTML = `<div class="panel settings-card gh-setup">
+        <div class="panel-head"><div><h2>Ligar a galeria ao site</h2><p class="sub">Feito uma vez só. Depois, é só escolher as fotos.</p></div></div>
+        <ol class="gh-steps">
+          <li>No computador, entre no GitHub e abra <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Novo token (fine-grained)</a>.</li>
+          <li>Em <b>Token name</b>, escreva <b>HG Gestão galeria</b>. Em <b>Expiration</b>, escolha o prazo mais longo.</li>
+          <li>Em <b>Repository access</b>, marque <b>Only select repositories</b> e escolha <b>zedthunder/hg3d</b>.</li>
+          <li>Em <b>Permissions → Repository permissions</b>, ache <b>Contents</b> e mude para <b>Read and write</b>.</li>
+          <li>Clique em <b>Generate token</b>, copie o código (começa com <b>github_pat_</b>) e cole abaixo.</li>
+        </ol>
+        <label class="field"><span>Token do GitHub</span><input id="gh-token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+        <div class="actions"><button class="btn btn-primary" data-action="gh-save" ${gallery.busy ? 'disabled' : ''}>${icon('check')}${gallery.busy || 'Salvar token'}</button></div>
+        <p class="hint">O token só consegue mexer nos arquivos do site. Ele fica salvo na sua conta, então os outros aparelhos já entram prontos.</p>
+      </div>`;
+      return;
+    }
+    const photos = gallery.photos || [];
+    const busy = gallery.busy;
+    let list;
+    if (gallery.loading && !gallery.photos) list = `<div class="panel empty empty-sm"><span class="spinner" aria-hidden="true"></span><span>Carregando as fotos do site…</span></div>`;
+    else if (gallery.error) list = `<div class="panel empty empty-sm"><strong>Não deu para carregar a galeria</strong><span>${esc(gallery.error)}</span><button class="btn btn-sm" data-action="gh-reload">Tentar de novo</button></div>`;
+    else if (!photos.length) list = `<div class="panel empty"><span class="empty-ic">${icon('image')}</span><strong>Nenhuma foto no catálogo</strong><span>As fotos que você enviar aparecem aqui e no site.</span></div>`;
+    else {
+      list = `<div class="photo-grid">${photos.map((p) => {
+        const caption = photoCaption(p.name);
+        return `<figure class="photo">
+          <img src="${esc(p.download_url)}" alt="${esc(caption || 'Foto do catálogo')}" loading="lazy" decoding="async">
+          <figcaption><span class="${caption ? '' : 'faint'}">${esc(caption || 'Sem legenda')}</span>
+            <button class="icon-btn danger" data-action="photo-del" data-name="${esc(p.name)}" title="Tirar do site" aria-label="Tirar a foto ${esc(caption || p.name)} do site" ${busy ? 'disabled' : ''}>${icon('trash')}</button>
+          </figcaption>
+        </figure>`;
+      }).join('')}</div>`;
+    }
+    el.innerHTML = `<div class="panel upload-panel">
+        <div class="panel-head"><div><h2>Enviar fotos</h2><p class="sub">As fotos são reduzidas para carregar rápido e aparecem no site em cerca de 1 minuto.</p></div></div>
+        <div class="upload-row">
+          <label class="field"><span>Legenda (opcional)</span><input id="photo-name" type="text" maxlength="60" placeholder="Ex.: Chaveiro personalizado" ${busy ? 'disabled' : ''}></label>
+          <label class="btn btn-primary btn-lg ${busy ? 'is-disabled' : ''}">${busy ? '<span class="spinner spinner-sm" aria-hidden="true"></span>' : icon('up')}${esc(busy || 'Escolher fotos')}
+            <input id="photo-input" type="file" accept="image/*" multiple class="visually-hidden" ${busy ? 'disabled' : ''}></label>
+        </div>
+        <p class="hint">A legenda vale para todas as fotos escolhidas de uma vez. Sem legenda, a foto aparece no site sem texto.</p>
+      </div>
+      <div class="gallery-bar"><span>${gallery.photos ? plural(photos.length, 'foto no site', 'fotos no site') : ''}</span>
+        <span class="gallery-bar-actions"><button class="btn-link" data-action="gh-reload">Atualizar</button><button class="btn-link" data-action="gh-forget">Trocar token</button></span></div>
+      ${list}`;
+  }
+
+  /* Reduz a foto (lado maior até 1600 px, JPEG) e devolve o conteúdo em base64. */
+  function readPhoto(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagem inválida')); };
+      img.src = url;
+    });
+  }
+
+  /* Todas as fotos escolhidas vão num envio só (um commit no GitHub). */
+  async function uploadPhotos(files) {
+    if (gallery.busy) return;
+    const images = files.filter((f) => f.type.startsWith('image/') || IMAGE_FILE.test(f.name));
+    if (!images.length) return toast('Escolha arquivos de imagem.', 'error');
+    const slug = photoSlug($('#photo-name') ? $('#photo-name').value : '');
+    const taken = new Set((gallery.photos || []).map((p) => p.name.toLowerCase()));
+    const stamp = Date.now();
+    const names = images.map((f, i) => {
+      // Sem legenda: nome em código, que o site não mostra como texto.
+      let base = slug || (stamp + i).toString(16);
+      let name = `${base}.jpg`;
+      for (let n = 2; taken.has(name.toLowerCase()); n += 1) name = `${base}-${n}.jpg`;
+      taken.add(name.toLowerCase());
+      return name;
+    });
+
+    try {
+      const blobs = [];
+      for (let i = 0; i < images.length; i += 1) {
+        gallery.busy = images.length > 1 ? `Preparando ${i + 1} de ${images.length}…` : 'Preparando…';
+        renderGallery();
+        let content;
+        try { content = await readPhoto(images[i]); } catch (err) {
+          throw Object.assign(new Error('leitura'), { file: images[i].name });
+        }
+        gallery.busy = images.length > 1 ? `Enviando ${i + 1} de ${images.length}…` : 'Enviando…';
+        renderGallery();
+        const blob = await gh('/git/blobs', { method: 'POST', body: JSON.stringify({ content, encoding: 'base64' }) });
+        blobs.push({ path: `${GH.dir}/${names[i]}`, mode: '100644', type: 'blob', sha: blob.sha });
+      }
+      gallery.busy = 'Publicando no site…';
+      renderGallery();
+      const ref = await gh(`/git/ref/heads/${GH.branch}`);
+      const head = await gh(`/git/commits/${ref.object.sha}`);
+      const tree = await gh('/git/trees', { method: 'POST', body: JSON.stringify({ base_tree: head.tree.sha, tree: blobs }) });
+      const message = images.length > 1 ? `Galeria: ${images.length} fotos novas` : `Galeria: foto nova ${names[0]}`;
+      const commit = await gh('/git/commits', { method: 'POST', body: JSON.stringify({ message, tree: tree.sha, parents: [head.sha] }) });
+      await gh(`/git/refs/heads/${GH.branch}`, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha }) });
+      gallery.busy = '';
+      toast(images.length > 1 ? `${images.length} fotos enviadas para o site.` : 'Foto enviada para o site.');
+      await loadPhotos();
+    } catch (err) {
+      gallery.busy = '';
+      renderGallery();
+      toast(err.file ? `Não foi possível ler a imagem ${err.file}.` : ghErrorText(err), 'error');
+    }
+  }
+
+  async function deletePhoto(name) {
+    const photo = (gallery.photos || []).find((p) => p.name === name);
+    if (!photo || gallery.busy) return;
+    if (!confirm(`Tirar esta foto do site?\n\n${photoCaption(name) || name}`)) return;
+    gallery.busy = 'Removendo…';
+    renderGallery();
+    try {
+      await gh(`/contents/${GH.dir}/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ message: `Galeria: remove ${name}`, sha: photo.sha, branch: GH.branch }),
+      });
+      gallery.photos = gallery.photos.filter((p) => p.name !== name);
+      toast('Foto removida do site.');
+    } catch (err) {
+      toast(ghErrorText(err), 'error');
+    }
+    gallery.busy = '';
+    renderGallery();
+  }
 
   /* ---------- início ---------- */
   syncThemeControls();
