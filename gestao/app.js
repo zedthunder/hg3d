@@ -355,8 +355,9 @@
     return `${material} · ${fmtGrams(r.grams)} · ${formatTime(r.hours)}`;
   }
 
-  /* O que o cliente vê. Item por mesas mostra só nome, quantidade e preço. */
-  const quoteMeta = (item) => (item.result.colors ? '' : itemMeta(item));
+  /* O que o cliente vê: material e tempo, sem os gramas. Item por mesas mostra só nome, quantidade e preço. */
+  const quoteMeta = (item) => (item.result.colors ? ''
+    : `${item.input.material || 'Filamento 3D'} · ${formatTime(item.result.hours)}`);
 
   function markDirty() {
     state.order.dirty = true;
