@@ -682,3 +682,20 @@ body.locked > :not(#login-view):not(.ambient):not(.toasts) { display: none !impo
 .photo .faint { color: var(--faint); }
 @media (max-width: 780px) { .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
 a.btn { text-decoration: none; }
+
+/* ---------- edição e orçamentos em aberto ---------- */
+.edit-note { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 14px; border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid var(--accent-line); font-size: 13px; color: var(--text); }
+.edit-note .ic { flex: none; color: var(--accent-text); margin-top: 1px; }
+.quote-row { padding: 12px 0; border-top: 1px solid var(--line); }
+.quote-row-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.quote-row-top .hist-title { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-row-val { font-variant-numeric: tabular-nums; flex: none; }
+.quote-row .hist-meta { margin-top: 2px; }
+.quote-row-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.quote-row-actions .icon-btn:first-of-type { margin-left: auto; }
+@media (max-width: 520px) {
+  .dash-row { flex-wrap: wrap; }
+  .dash-row-main { flex: 1 1 100%; }
+  .dash-row-right { flex: 1 1 100%; justify-content: flex-end; }
+  .dash-row-right .hist-val { margin-right: auto; text-align: left; }
+}

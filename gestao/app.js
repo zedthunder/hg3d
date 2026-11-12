@@ -383,34 +383,60 @@
     $('[data-f="name"]').focus();
   }
 
+  /* Carrinho novo: "Gerar orçamento" e "Salvar pedido" sempre criam um registro novo.
+     Registro aberto pelo dashboard: os botões passam a atualizar esse registro. */
   function renderOrder() {
     const o = state.order;
     const el = $('#order-panel');
     const t = orderTotals(o.items);
+    const editing = !!o.id;
     const approved = isApproved(o);
-    const status = (approved ? `<span class="badge saved">Aprovado</span>` : '') + (o.dirty && o.items.length
-      ? `<span class="badge unsaved">Não salvo</span>`
-      : o.id && !approved ? `<span class="badge saved">Salvo</span>` : '');
+    const kind = approved ? 'pedido' : 'orçamento';
     const clientFocused = document.activeElement && document.activeElement.id === 'order-client';
 
+    const title = editing ? `Editando ${kind} ${esc(refLabel(o.ref))}` : 'Novo pedido';
+    const status = editing && o.dirty ? '<span class="badge unsaved">Alterações não salvas</span>' : '';
     const head = `<div class="panel-head">
-        <div class="order-title"><h2>${approved ? 'Pedido' : 'Orçamento'} ${esc(refLabel(o.ref))}</h2>
+        <div class="order-title"><h2>${title}</h2>
           <span class="badge ${o.items.length ? 'accent' : ''}">${plural(o.items.length, 'item', 'itens')}</span>${status}
-          ${o.id
-            ? `<button class="icon-btn danger" data-action="order-delete" title="Excluir ${kindLabel(o)}" aria-label="Excluir ${kindLabel(o)} ${esc(refLabel(o.ref))}">${icon('trash')}</button>`
+          ${editing
+            ? `<button class="icon-btn danger" data-action="order-delete" title="Excluir ${kind}" aria-label="Excluir ${kind} ${esc(refLabel(o.ref))}">${icon('trash')}</button>`
             : o.items.length
-              ? `<button class="icon-btn danger" data-action="order-new" title="Descartar ${kindLabel(o)}" aria-label="Descartar ${kindLabel(o)} não salvo">${icon('trash')}</button>`
+              ? `<button class="icon-btn danger" data-action="order-new" title="Esvaziar pedido" aria-label="Esvaziar o pedido novo">${icon('trash')}</button>`
               : ''}</div>
       </div>`;
+    const editNote = editing
+      ? `<div class="edit-note">${icon('edit')}<span>Você está alterando o ${kind} ${esc(refLabel(o.ref))}. Mude os itens e clique em <b>Atualizar ${kind}</b>.</span></div>`
+      : '';
 
     if (!o.items.length) {
-      el.innerHTML = `${head}<div class="empty empty-sm"><span class="empty-ic">${icon('file')}</span>
+      el.innerHTML = `${head}${editNote}<div class="empty empty-sm"><span class="empty-ic">${icon('file')}</span>
         <strong>Nenhum item ainda</strong>
-        <span>Calcule uma peça e use “Adicionar ao pedido”. Dá para ter quantos itens você quiser, e depois salvar como orçamento ou aprovar como pedido.</span></div>`;
+        <span>Calcule uma peça e use “Adicionar ao pedido”. Depois, gere o orçamento para o cliente ou salve direto como pedido.</span></div>
+        ${editing ? `<div class="order-foot"><button class="btn-link" data-action="order-new">Cancelar edição</button></div>` : ''}`;
       return;
     }
 
-    el.innerHTML = `${head}
+    const buttons = editing
+      ? `<button class="btn btn-primary btn-lg btn-block" data-action="order-update">${icon('save')}Atualizar ${kind}</button>
+        <div class="grid-actions">
+          ${approved ? '' : `<button class="btn btn-approve" data-action="order-approve">${icon('check')}Aprovar como pedido</button>`}
+          <button class="btn" data-action="order-pdf">${icon('file')}Ver PDF</button>
+          <button class="btn" data-action="order-whatsapp">${icon('send')}WhatsApp</button>
+          <button class="btn" data-action="order-csv">${icon('down')}CSV</button>
+          <button class="btn" data-action="order-copy">${icon('copy')}Copiar</button>
+        </div>
+        <div class="order-foot"><button class="btn-link" data-action="order-new">Cancelar edição</button></div>`
+      : `<button class="btn btn-primary btn-lg btn-block" data-action="order-quote">${icon('file')}Gerar orçamento</button>
+        <div class="grid-actions">
+          <button class="btn btn-approve" data-action="order-save">${icon('check')}Salvar pedido</button>
+          <button class="btn" data-action="order-whatsapp">${icon('send')}WhatsApp</button>
+          <button class="btn" data-action="order-csv">${icon('down')}CSV</button>
+          <button class="btn" data-action="order-copy">${icon('copy')}Copiar</button>
+        </div>
+        <p class="hint">“Gerar orçamento” salva um orçamento novo e abre o PDF. “Salvar pedido” salva um pedido novo, já contando como venda.</p>`;
+
+    el.innerHTML = `${head}${editNote}
       <label class="field"><span>Cliente</span><input id="order-client" type="text" placeholder="Nome do cliente" value="${esc(o.client)}"></label>
       <ul class="order-items">${o.items.map((item) => `
         <li class="order-item ${item.id === state.editingItemId ? 'editing' : ''}">
@@ -428,16 +454,8 @@
         ${t.discount > 0 ? `<div><span>Desconto no orçamento</span><span>-${fmtMoney(t.discount)}</span></div>` : ''}
         <div class="grand"><span>Total</span><span>${fmtMoney(t.price)}</span></div>
       </div>
-      <label class="field"><span>Observações deste orçamento</span><textarea id="order-notes" rows="2" placeholder="Aparece no documento do cliente">${esc(o.notes)}</textarea></label>
-      <button class="btn btn-primary btn-lg btn-block" data-action="quote">${icon('file')}Gerar ${approved ? 'pedido' : 'orçamento'}</button>
-      <div class="grid-actions">
-        ${approved ? '' : `<button class="btn btn-approve" data-action="order-approve">${icon('check')}Aprovar como pedido</button>`}
-        <button class="btn" data-action="order-save">${icon('save')}${approved ? 'Salvar pedido' : 'Salvar orçamento'}</button>
-        <button class="btn" data-action="order-whatsapp">${icon('send')}WhatsApp</button>
-        <button class="btn" data-action="order-csv">${icon('down')}CSV</button>
-        <button class="btn" data-action="order-copy">${icon('copy')}Copiar</button>
-      </div>
-      <div class="order-foot"><button class="btn-link" data-action="order-new">Começar novo orçamento</button></div>`;
+      <label class="field"><span>Observações</span><textarea id="order-notes" rows="2" placeholder="Aparece no documento do cliente">${esc(o.notes)}</textarea></label>
+      ${buttons}`;
 
     if (clientFocused) $('#order-client').focus();
   }
@@ -509,34 +527,70 @@
 
   const clearDeductions = (items) => items.forEach((i) => { delete i.deducted; delete i.deductions; });
 
-  /* Só o pedido aprovado consome estoque e conta como venda. */
+  /* Grava o que está na calculadora: cria um registro novo ou atualiza o registro aberto.
+     Só o pedido aprovado consome estoque e conta como venda. */
   function persistOrder(status) {
     const o = state.order;
-    if (!o.items.length) return;
+    if (!o.items.length) return null;
     ensureRef();
     const existing = o.id ? state.history.find((h) => h.id === o.id) : null;
     const approved = status === 'approved';
     const short = reconcileStock(existing ? existing.items : [], approved ? o.items : []);
     if (!approved) clearDeductions(o.items);
     if (!o.id) o.id = uid();
+    if (!o.createdAt) o.createdAt = new Date().toISOString();
     o.status = status;
     o.approvedAt = approved ? (o.approvedAt || new Date().toISOString()) : null;
     o.savedAt = new Date().toISOString();
     o.dirty = false;
     const record = clone(o);
+    delete record.dirty;
     if (existing) state.history[state.history.indexOf(existing)] = record;
     else state.history.unshift(record);
-    save();
-    renderOrder();
+    if (short.length) toast(`Estoque insuficiente em ${short.join(', ')}. Salvo mesmo assim.`, 'error');
+    return record;
+  }
+
+  /* Depois de salvar, a calculadora volta para um pedido novo e vazio. */
+  function clearCart() {
+    state.order = newOrder();
+    resetForm(true); // salva e redesenha formulário e pedido
     renderColors();
     syncFormChrome();
     renderDashboard();
-    if (short.length) toast(`Estoque insuficiente em ${short.join(', ')}. Pedido salvo mesmo assim.`, 'error');
-    else toast(`${approved ? 'Pedido' : 'Orçamento'} ${refLabel(o.ref)} salvo.`);
+    renderHistory();
   }
 
-  const saveOrder = () => persistOrder(state.order.status);
-  const approveOrder = () => persistOrder('approved');
+  /* Carrinho novo → pedido novo, já aprovado. */
+  function saveNewOrder() {
+    const rec = persistOrder('approved');
+    if (!rec) return;
+    clearCart();
+    toast(`Pedido ${refLabel(rec.ref)} salvo. Ele está no dashboard.`);
+  }
+
+  /* Carrinho novo → orçamento novo, salvo no dashboard, e abre o PDF. */
+  function generateNewQuote() {
+    const rec = persistOrder('quote');
+    if (!rec) return;
+    clearCart();
+    openQuote(rec);
+    toast(`Orçamento ${refLabel(rec.ref)} salvo no dashboard.`);
+  }
+
+  /* Registro aberto pelo dashboard → grava por cima dele e volta ao dashboard. */
+  function updateOpenRecord(status) {
+    const o = state.order;
+    if (!o.id) return;
+    const approving = status === 'approved' && !isApproved(o);
+    const rec = persistOrder(status || o.status);
+    if (!rec) return toast('Adicione pelo menos um item antes de atualizar.', 'error');
+    clearCart();
+    setTab('dashboard');
+    toast(approving
+      ? `Orçamento aprovado. Agora é o pedido ${refLabel(rec.ref)}.`
+      : `${isApproved(rec) ? 'Pedido' : 'Orçamento'} ${refLabel(rec.ref)} atualizado.`);
+  }
 
   /* Aprova ou desfaz a aprovação de um registro salvo, a partir das listas. */
   function setRecordStatus(id, status) {
@@ -563,7 +617,8 @@
 
   function newOrderFlow() {
     const o = state.order;
-    if (o.dirty && o.items.length && !confirm(`Este ${kindLabel(o)} tem alterações não salvas. Descartar e começar outro?`)) return;
+    if (o.id ? o.dirty && o.items.length && !confirm(`O ${kindLabel(o)} ${refLabel(o.ref)} tem alterações não salvas. Sair sem salvar?`)
+      : o.items.length && !confirm('Esvaziar o pedido novo? Os itens adicionados serão descartados.')) return;
     state.order = newOrder();
     resetForm(true);
   }
@@ -613,16 +668,17 @@
   }
 
   function renderQuote() {
-    const o = state.order;
+    const o = quoteOrder;
     const p = state.profile;
     const t = orderTotals(o.items);
-    const now = new Date();
+    // Orçamento salvo mantém a data em que foi gerado.
+    const issued = new Date(o.createdAt || o.savedAt || Date.now());
     const days = Math.max(0, Math.floor(parseNumber(p.validityDays)));
-    const until = new Date(now.getTime() + days * 86400000);
+    const until = new Date(issued.getTime() + days * 86400000);
     const approved = isApproved(o);
     const meta = `<h3>${approved ? 'PEDIDO' : 'ORÇAMENTO'}</h3>
       <div>Nº <b>${esc(refLabel(o.ref))}</b></div>
-      <div>Data: <b>${fmtDate(approved ? o.approvedAt : now)}</b></div>
+      <div>Data: <b>${fmtDate(approved ? o.approvedAt : issued)}</b></div>
       ${days > 0 && !approved ? `<div>Válido até: <b>${fmtDate(until)}</b></div>` : ''}`;
     $('#quote-title').textContent = approved ? 'Prévia do pedido' : 'Prévia do orçamento';
     $('#quote-paper').innerHTML = `${profileHeader(meta)}
@@ -654,17 +710,18 @@
     warn.innerHTML = p.name ? '' : 'Seu perfil está vazio, então o cabeçalho mostra o nome do app. <button class="btn-link" data-action="goto-profile">Configurar perfil</button>';
   }
 
-  function openQuote() {
-    if (!state.order.items.length) return;
-    ensureRef();
-    renderOrder();
+  /* Mostra o documento de um registro salvo ou do que está na calculadora. */
+  let quoteOrder = null;
+  function openQuote(record) {
+    quoteOrder = record;
+    if (!quoteOrder || !quoteOrder.items.length) return;
     renderQuote();
     $('#quote-dialog').showModal();
   }
 
   function printQuote() {
     const title = document.title;
-    const o = state.order;
+    const o = quoteOrder;
     document.title = `${isApproved(o) ? 'Pedido' : 'Orcamento'} ${refLabel(o.ref)}${o.client ? ` - ${o.client}` : ''}`;
     window.addEventListener('afterprint', () => { document.title = title; }, { once: true });
     window.print();
@@ -728,7 +785,8 @@
               ${isApproved(o)
                 ? `<button class="icon-btn" data-action="record-undo" data-id="${esc(o.id)}" title="Voltar para orçamento" aria-label="Voltar ${esc(refLabel(o.ref))} para orçamento">${icon('undo')}</button>`
                 : `<button class="btn btn-sm btn-approve" data-action="record-approve" data-id="${esc(o.id)}">${icon('check')}Aprovar</button>`}
-              <button class="icon-btn" data-action="history-open" data-id="${esc(o.id)}" title="Abrir" aria-label="Abrir ${esc(refLabel(o.ref))}">${icon('edit')}</button>
+              <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF de ${esc(refLabel(o.ref))}">${icon('file')}</button>
+              <button class="icon-btn" data-action="history-open" data-id="${esc(o.id)}" title="Atualizar" aria-label="Atualizar ${esc(refLabel(o.ref))}">${icon('edit')}</button>
               <button class="icon-btn danger" data-action="history-del" data-id="${esc(o.id)}" title="Excluir" aria-label="Excluir ${esc(refLabel(o.ref))}">${icon('trash')}</button>
             </div>
           </div>
@@ -748,7 +806,10 @@
     const rec = state.history.find((h) => h.id === id);
     if (!rec) return;
     const o = state.order;
-    if (o.dirty && o.items.length && !confirm(`O ${kindLabel(o)} aberto tem alterações não salvas. Descartar e abrir este?`)) return;
+    const unsaved = o.id ? o.dirty && o.items.length : o.items.length;
+    if (unsaved && !confirm(o.id
+      ? `O ${kindLabel(o)} ${refLabel(o.ref)} tem alterações não salvas. Descartar e abrir este?`
+      : `A calculadora tem um pedido novo com ${plural(o.items.length, 'item', 'itens')} ainda não salvo. Descartar e abrir este?`)) return;
     state.order = { ...newOrder(), ...clone(rec), dirty: false };
     state.editingItemId = null;
     save();
@@ -756,7 +817,7 @@
     fillForm();
     renderResult();
     renderOrder();
-    toast(`${isApproved(rec) ? 'Pedido' : 'Orçamento'} ${refLabel(rec.ref)} aberto.`);
+    toast(`${isApproved(rec) ? 'Pedido' : 'Orçamento'} ${refLabel(rec.ref)} aberto para atualizar.`);
   }
 
   function deleteHistoryOrder(id) {
@@ -827,14 +888,15 @@
           </div>
           <div class="dash-row-right">
             <div class="hist-val"><b>${fmtMoney(t.price)}</b><span class="${t.profit < 0 ? 'bad' : ''}">${t.profit < 0 ? 'prejuízo' : 'lucro'} ${fmtMoney(t.profit)}</span></div>
-            <button class="icon-btn" data-action="history-open" data-id="${esc(o.id)}" title="Abrir" aria-label="Abrir pedido ${esc(refLabel(o.ref))}">${icon('edit')}</button>
+            <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do pedido ${esc(refLabel(o.ref))}">${icon('file')}</button>
+            <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
           </div>
         </div>`;
       }).join('') + `<div class="dash-foot"><span>Total vendido</span><span>${fmtMoney(sales.price)}</span></div>`
     : `<div class="empty empty-sm"><span class="empty-ic">${icon('check')}</span><strong>Nenhum pedido neste mês</strong><span>Aprove um orçamento para o valor entrar aqui.</span></div>`}`;
 
     renderGoals();
-    renderLastQuote(open);
+    renderOpenQuotes(open);
   }
 
   function renderGoals() {
@@ -859,24 +921,34 @@
       }).join('') : `<div class="empty empty-sm"><span class="empty-ic">${icon('target')}</span><strong>Nenhuma meta</strong><span>Crie uma meta de lucro ou de vendas.</span></div>`}`;
   }
 
-  function renderLastQuote(open) {
-    const last = [...open].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))[0];
+  /* Orçamentos ainda não aprovados, do mais recente para o mais antigo. */
+  function renderOpenQuotes(open) {
+    const list = [...open].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
     const el = $('#dash-last');
-    if (!last) {
-      el.innerHTML = `<div class="panel-head"><h2>Último orçamento</h2></div>
-        <div class="empty empty-sm"><span class="empty-ic">${icon('file')}</span><strong>Nenhum orçamento em aberto</strong><span>Os orçamentos salvos e ainda não aprovados aparecem aqui.</span></div>`;
+    if (!list.length) {
+      el.innerHTML = `<div class="panel-head"><h2>Orçamentos em aberto</h2></div>
+        <div class="empty empty-sm"><span class="empty-ic">${icon('file')}</span><strong>Nenhum orçamento em aberto</strong><span>Use “Gerar orçamento” na calculadora e ele aparece aqui.</span></div>`;
       return;
     }
-    const t = orderTotals(last.items);
-    el.innerHTML = `<div class="panel-head"><h2>Último orçamento</h2><span class="badge">${esc(refLabel(last.ref))}</span></div>
-      <div class="hist-title">${esc(last.client || 'Sem cliente')}</div>
-      <div class="last-total">${fmtMoney(t.price)}</div>
-      <div class="hist-meta">${fmtDate(last.savedAt)} · ${esc(last.items.map((i) => `${i.result.qty}× ${i.input.name}`).join(', '))}</div>
-      <div class="last-actions">
-        <button class="btn btn-approve" data-action="record-approve" data-id="${esc(last.id)}">${icon('check')}Aprovar</button>
-        <button class="btn" data-action="history-open" data-id="${esc(last.id)}">${icon('edit')}Abrir</button>
-        <button class="icon-btn danger" data-action="history-del" data-id="${esc(last.id)}" title="Excluir orçamento" aria-label="Excluir orçamento ${esc(refLabel(last.ref))}">${icon('trash')}</button>
-      </div>`;
+    const shown = list.slice(0, 8);
+    el.innerHTML = `<div class="panel-head"><h2>Orçamentos em aberto</h2><span class="badge">${list.length}</span></div>
+      ${shown.map((o) => {
+        const t = orderTotals(o.items);
+        return `<div class="quote-row">
+          <div class="quote-row-top">
+            <div class="hist-title">${esc(refLabel(o.ref))} · ${esc(o.client || 'Sem cliente')}</div>
+            <b class="quote-row-val">${fmtMoney(t.price)}</b>
+          </div>
+          <div class="hist-meta">${fmtDate(o.savedAt)} · ${esc(o.items.map((i) => `${i.result.qty}× ${i.input.name}`).join(', '))}</div>
+          <div class="quote-row-actions">
+            <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
+            <button class="btn btn-sm btn-approve" data-action="record-approve" data-id="${esc(o.id)}">${icon('check')}Aprovar</button>
+            <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do orçamento ${esc(refLabel(o.ref))}">${icon('file')}</button>
+            <button class="icon-btn danger" data-action="history-del" data-id="${esc(o.id)}" title="Excluir orçamento" aria-label="Excluir orçamento ${esc(refLabel(o.ref))}">${icon('trash')}</button>
+          </div>
+        </div>`;
+      }).join('')}
+      ${list.length > shown.length ? `<div class="order-foot"><button class="btn-link" data-action="open-quotes-history">Ver todos os ${list.length} orçamentos</button></div>` : ''}`;
   }
 
   function openGoalForm(id) {
@@ -1141,12 +1213,15 @@
     'item-edit': (b) => editItem(b.dataset.id),
     'item-dup': (b) => duplicateItem(b.dataset.id),
     'item-del': (b) => deleteItem(b.dataset.id),
-    quote: openQuote,
+    'order-quote': generateNewQuote,
+    'order-pdf': () => { ensureRef(); renderOrder(); openQuote(clone(state.order)); },
+    'record-pdf': (b) => openQuote(state.history.find((h) => h.id === b.dataset.id)),
     print: printQuote,
     'close-dialog': (b) => b.closest('dialog').close(),
     'goto-profile': (b) => { b.closest('dialog').close(); setTab('settings'); },
-    'order-save': saveOrder,
-    'order-approve': approveOrder,
+    'order-save': saveNewOrder,
+    'order-update': () => updateOpenRecord(),
+    'order-approve': () => updateOpenRecord('approved'),
     'record-approve': (b) => setRecordStatus(b.dataset.id, 'approved'),
     'record-undo': (b) => setRecordStatus(b.dataset.id, 'quote'),
     'history-filter': (b) => { state.historyFilter = b.dataset.filter; renderHistory(); },
@@ -1200,6 +1275,7 @@
       renderDashboard();
     },
     'history-open': (b) => openHistoryOrder(b.dataset.id),
+    'open-quotes-history': () => { state.historyFilter = 'quote'; setTab('history'); },
     'history-del': (b) => deleteHistoryOrder(b.dataset.id),
     'order-delete': deleteOpenOrder,
     'spool-new': () => openSpoolForm(null),
