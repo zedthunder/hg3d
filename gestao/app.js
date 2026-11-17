@@ -452,7 +452,7 @@
       <div class="totals">
         <div><span>Custo</span><span>${fmtMoney(t.cost)}</span></div>
         <div class="${t.profit < 0 ? 'bad' : 'good'}"><span>${t.profit < 0 ? 'Prejuízo' : 'Lucro'}</span><span>${fmtMoney(t.profit)}</span></div>
-        ${t.discount > 0 ? `<div><span>Desconto no orçamento</span><span>-${fmtMoney(t.discount)}</span></div>` : ''}
+        ${t.discount > 0 ? `<div><span>Desconto dado (só você vê)</span><span>-${fmtMoney(t.discount)}</span></div>` : ''}
         <div class="grand"><span>Total</span><span>${fmtMoney(t.price)}</span></div>
       </div>
       <label class="field"><span>Observações</span><textarea id="order-notes" rows="2" placeholder="Aparece no documento do cliente">${esc(o.notes)}</textarea></label>
@@ -632,9 +632,8 @@
     const lines = [`*${approved ? 'Pedido' : 'Orçamento'} ${refLabel(o.ref)}${p.name ? ` · ${p.name}` : ''}*`];
     if (o.client) lines.push(`Cliente: ${o.client}`);
     lines.push('');
-    o.items.forEach((i) => lines.push(`• ${i.result.qty}× ${i.input.name}: ${fmtMoney(i.result.listPrice ?? i.result.price)}`));
+    o.items.forEach((i) => lines.push(`• ${i.result.qty}× ${i.input.name}: ${fmtMoney(i.result.price)}`));
     lines.push('');
-    if (t.discount > 0) lines.push(`Subtotal: ${fmtMoney(t.subtotal)}`, `Desconto: -${fmtMoney(t.discount)}`);
     lines.push(`*Total: ${fmtMoney(t.price)}*`);
     if (!approved && p.validityDays > 0) lines.push(`Válido por ${plural(Number(p.validityDays), 'dia', 'dias')}.`);
     if (p.payment) lines.push(`Pagamento: ${p.payment}`);
@@ -687,7 +686,7 @@
       <table class="q-table">
         <thead><tr><th>#</th><th>Item</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead>
         <tbody>${o.items.map((i, n) => {
-          const listed = i.result.listPrice ?? i.result.price;
+          const listed = i.result.price; // preço final: o cliente não vê desconto
           return `<tr>
           <td>${n + 1}</td>
           <td><div class="q-item-name">${esc(i.input.name)}</div>${quoteMeta(i) ? `<div class="q-item-meta">${esc(quoteMeta(i))}</div>` : ''}</td>
@@ -695,10 +694,6 @@
         </tr>`;
         }).join('')}</tbody>
       </table>
-      ${t.discount > 0 ? `<div class="q-summary">
-        <div><span>Subtotal</span><span>${fmtMoney(t.subtotal)}</span></div>
-        <div><span>Desconto</span><span>-${fmtMoney(t.discount)}</span></div>
-      </div>` : ''}
       <div class="q-total"><div><span>Total do pedido</span><b>${fmtMoney(t.price)}</b></div></div>
       <section class="q-notes">
         ${o.notes ? `<div><div class="q-label">Observações</div><p>${esc(o.notes)}</p></div>` : ''}
