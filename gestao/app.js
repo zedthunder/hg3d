@@ -542,6 +542,7 @@
     if (!o.createdAt) o.createdAt = new Date().toISOString();
     o.status = status;
     o.approvedAt = approved ? (o.approvedAt || new Date().toISOString()) : null;
+    if (!approved) { delete o.stage; delete o.doneAt; }
     o.savedAt = new Date().toISOString();
     o.dirty = false;
     const record = clone(o);
@@ -603,9 +604,11 @@
     if (!approved) clearDeductions(rec.items);
     rec.status = status;
     rec.approvedAt = approved ? new Date().toISOString() : null;
+    if (!approved) { delete rec.stage; delete rec.doneAt; }
     if (state.order.id === id) {
       state.order.status = status;
       state.order.approvedAt = rec.approvedAt;
+      if (!approved) { delete state.order.stage; delete state.order.doneAt; }
     }
     save();
     renderOrder();
@@ -794,9 +797,38 @@
       }).join('') || `<div class="panel empty empty-sm"><span>Nada neste filtro.</span></div>`}</div>`;
   }
 
-  const statusBadge = (o) => (isApproved(o)
-    ? `<span class="badge saved">Pedido aprovado</span>`
-    : `<span class="badge">Orçamento</span>`);
+  /* Andamento do pedido aprovado: sem marcação = aguardando, depois em produção e concluído. */
+  const STAGES = { production: 'Em produção', done: 'Concluído' };
+  const isDone = (o) => o.stage === 'done';
+  const statusBadge = (o) => {
+    if (!isApproved(o)) return `<span class="badge">Orçamento</span>`;
+    if (o.stage === 'done') return `<span class="badge saved">Concluído</span>`;
+    if (o.stage === 'production') return `<span class="badge stage-production">Em produção</span>`;
+    return `<span class="badge unsaved">Pedido aguardando</span>`;
+  };
+  const stageButtons = (o) => `<div class="stage-row" role="group" aria-label="Andamento do pedido ${esc(refLabel(o.ref))}">
+      ${Object.entries(STAGES).map(([key, label]) => `<button class="stage-btn stage-${key} ${o.stage === key ? 'active' : ''}" data-action="record-stage" data-id="${esc(o.id)}" data-stage="${key}" aria-pressed="${o.stage === key}">${icon(key === 'done' ? 'check' : 'cube')}${label}</button>`).join('')}
+    </div>`;
+
+  /* Clicar no andamento já marcado desmarca (volta para aguardando). */
+  function setStage(id, stage) {
+    const rec = state.history.find((h) => h.id === id);
+    if (!rec || !isApproved(rec)) return;
+    if (rec.stage === stage) { delete rec.stage; delete rec.doneAt; }
+    else {
+      rec.stage = stage;
+      if (stage === 'done') rec.doneAt = new Date().toISOString(); else delete rec.doneAt;
+    }
+    if (state.order.id === id) {
+      state.order.stage = rec.stage;
+      state.order.doneAt = rec.doneAt;
+      if (!rec.stage) { delete state.order.stage; delete state.order.doneAt; }
+    }
+    save();
+    renderDashboard();
+    renderHistory();
+    toast(rec.stage ? `Pedido ${refLabel(rec.ref)}: ${STAGES[rec.stage].toLowerCase()}.` : `Pedido ${refLabel(rec.ref)} voltou para aguardando.`);
+  }
 
   function openHistoryOrder(id) {
     const rec = state.history.find((h) => h.id === id);
@@ -867,10 +899,16 @@
     const sales = salesInMonth(state.history, key);
     const open = state.history.filter((o) => !isApproved(o));
     const openTotal = money(open.reduce((a, o) => a + orderTotals(o.items).price, 0));
+    // Lucro realizado: pedidos concluídos. Lucro previsto: aprovados que ainda falta concluir.
+    const profitOf = (list) => money(list.reduce((a, o) => a + orderTotals(o.items).profit, 0));
+    const done = sales.orders.filter(isDone);
+    const pending = sales.orders.filter((o) => !isDone(o));
+    const realized = profitOf(done);
+    const expected = profitOf(pending);
     $('#dash-kpis').innerHTML = `
-      <div class="panel kpi"><span>Vendido em ${esc(shortMonth)}</span><b>${fmtMoney(sales.price)}</b></div>
-      <div class="panel kpi ${sales.profit < 0 ? 'bad' : 'good'}"><span>${sales.profit < 0 ? 'Prejuízo' : 'Lucro'} em ${esc(shortMonth)}</span><b>${fmtMoney(sales.profit)}</b></div>
-      <div class="panel kpi"><span>Pedidos aprovados</span><b>${sales.count}</b></div>
+      <div class="panel kpi"><span>Vendido em ${esc(shortMonth)}</span><b>${fmtMoney(sales.price)}</b><small>${plural(sales.count, 'pedido aprovado', 'pedidos aprovados')}</small></div>
+      <div class="panel kpi ${realized < 0 ? 'bad' : 'good'}"><span>Lucro realizado</span><b>${fmtMoney(realized)}</b><small>${plural(done.length, 'pedido concluído', 'pedidos concluídos')}</small></div>
+      <div class="panel kpi kpi-expected"><span>Lucro previsto</span><b>${fmtMoney(expected)}</b><small>${plural(pending.length, 'pedido', 'pedidos')} a concluir</small></div>
       <div class="panel kpi"><span>Orçamentos abertos</span><b>${open.length}</b><small>${fmtMoney(openTotal)} em aberto</small></div>`;
 
     $('#dash-orders').innerHTML = `
@@ -887,6 +925,7 @@
             <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do pedido ${esc(refLabel(o.ref))}">${icon('file')}</button>
             <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
           </div>
+          ${stageButtons(o)}
         </div>`;
       }).join('') + `<div class="dash-foot"><span>Total vendido</span><span>${fmtMoney(sales.price)}</span></div>`
     : `<div class="empty empty-sm"><span class="empty-ic">${icon('check')}</span><strong>Nenhum pedido neste mês</strong><span>Aprove um orçamento para o valor entrar aqui.</span></div>`}`;
@@ -1220,6 +1259,7 @@
     'order-approve': () => updateOpenRecord('approved'),
     'record-approve': (b) => setRecordStatus(b.dataset.id, 'approved'),
     'record-undo': (b) => setRecordStatus(b.dataset.id, 'quote'),
+    'record-stage': (b) => setStage(b.dataset.id, b.dataset.stage),
     'history-filter': (b) => { state.historyFilter = b.dataset.filter; renderHistory(); },
     'month-prev': () => shiftMonth(-1),
     'month-next': () => shiftMonth(1),

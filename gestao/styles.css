@@ -702,3 +702,14 @@ a.btn { text-decoration: none; }
   .dash-row-right { flex: 1 1 100%; justify-content: flex-end; }
   .dash-row-right .hist-val { margin-right: auto; text-align: left; }
 }
+
+/* ---------- andamento dos pedidos ---------- */
+.dash-row { flex-wrap: wrap; }
+.stage-row { flex: 1 1 100%; display: flex; gap: 6px; }
+.stage-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.stage-btn .ic { width: 14px; height: 14px; }
+.stage-btn:hover { color: var(--text); border-color: var(--muted); }
+.stage-btn.stage-production.active { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+.stage-btn.stage-done.active { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+.badge.stage-production { color: var(--warn); background: var(--warn-soft); }
+.kpi-expected b { color: var(--warn); }
