@@ -86,7 +86,7 @@
     <h1>🎄 Árvore de Nomes 3D</h1>
     <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
     <div class="head-row">
-      <span class="version" title="Versão do app">versão 1.3</span>
+      <span class="version" title="Versão do app">versão 1.4</span>
       <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
     </div>
   </header>
@@ -165,6 +165,8 @@
         <div><label>Ângulo da árvore (°)</label><input autocomplete="off" type="number" id="angle" value="25" min="10" max="45"></div>
         <div><label>Altura da letra no topo</label><input autocomplete="off" type="number" id="hTop" value="14" step="0.5" min="3"></div>
         <div><label>Altura da letra na base</label><input autocomplete="off" type="number" id="hBot" value="28" step="0.5" min="3"></div>
+        <div><label>Largura do primeiro nome (mm)</label><input autocomplete="off" type="number" id="firstW" value="" placeholder="automática" min="5" step="1"></div>
+        <div><label>Altura do primeiro nome (mm)</label><input autocomplete="off" type="number" id="firstH" value="" placeholder="automática" min="3" step="0.5"></div>
         <div><label>Largura do ano</label>
           <select autocomplete="off" id="yearMode">
             <option value="fixed" selected>Medida fixa (abaixo)</option>
@@ -313,7 +315,8 @@ function params() {
     gap: Math.max(0, n('gap')), lineGap: Math.max(0, n('lineGap')), pinD: Math.max(1.5, n('pinD')), pinH: Math.max(1, n('pinH')),
     font: fontSel.value, bold: Math.max(0, n('bold')), fatAccents: $('fatAccents').checked,
     accentBand: Math.min(0.6, Math.max(0.1, n('accentBand') / 100)), sideBars: $('sideBars').checked, trimBars: $('trimBars').checked,
-    wTop: Math.max(5, n('wTop')), angle: Math.min(45, Math.max(10, n('angle'))), yearW: n('yearW'), yearH: Math.max(3, n('yearH')), yearMode: $('yearMode').value,
+    wTop: Math.max(5, n('wTop')), angle: Math.min(45, Math.max(10, n('angle'))), firstW: n('firstW') >= 5 ? n('firstW') : 0, firstH: n('firstH') >= 3 ? n('firstH') : 0,
+    yearW: n('yearW'), yearH: Math.max(3, n('yearH')), yearMode: $('yearMode').value,
     starSize: n('starSize'), mh: n('mh'), t: Math.max(0.6, n('t')),
     Dtop: Math.max(3, n('Dtop')), Dbot: Math.max(3, n('Dbot')), D: Math.max(3, n('Dtop'), n('Dbot')),
     pw: n('pw'), pl: n('pl'), tol: n('tol'), twoPegMin: n('twoPegMin'), explode: n('explode'),
@@ -866,16 +869,22 @@ function buildModel(font, p, withConnectors) {
     const k = B.lines.length;
     // cada linha: largura pela diagonal na altura em que ela começa, altura pela posição na árvore
     const Ls = [];
-    let off = p.t;
+    let off = p.t, offAuto = p.t; // offAuto: onde a linha começaria com o tamanho automático
     B.lines.forEach((s, j) => {
       const lineD = j === 0 ? d : d + off;
-      const lp = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.plateW, 2 * tanA * lineD) : 2 * tanA * lineD;
+      let lp = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.plateW, 2 * tanA * lineD) : 2 * tanA * lineD;
+      const isFirst = bi === 0 && B.kind === 'name';
+      // primeiro nome com largura própria: a 1ª linha fica com essa largura e a 2ª (nome composto) mantém a proporção
+      if (isFirst && p.firstW) lp = p.firstW * (j === 0 ? d : d + offAuto) / d;
       const lw = Math.max(5, lp - 2 * p.mh - 2 * side);
-      let h;
-      if (B.kind === 'year') h = p.yearH;
+      let h, hAuto;
+      if (B.kind === 'year') h = hAuto = p.yearH;
       else {
         const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
         h = (p.hTop + (p.hBot - p.hTop) * tt) * (k > 1 ? 0.8 : 1);
+        // primeiro nome com altura própria: a 1ª linha fica com essa altura, a 2ª cresce na mesma proporção
+        hAuto = h;
+        if (isFirst && p.firstH) h *= p.firstH / (p.hTop * (k > 1 ? 0.8 : 1));
         gi++;
       }
       // espaçamento só muda o vão entre as letras: a largura de cada letra fica igual à do espaçamento 0
@@ -886,6 +895,8 @@ function buildModel(font, p, withConnectors) {
       L.plateW = ratio === 1 ? lp : L.w + 2 * p.mh + 2 * side;
       Ls.push(L);
       off += L.accH + L.letterH + (j < k - 1 ? L.cedH + p.t : 0);
+      const sAuto = hAuto / L.letterH;
+      offAuto += (L.accH + L.letterH) * sAuto + (j < k - 1 ? L.cedH * sAuto + p.t : 0);
     });
     if (!Ls.length) return;
     const last = Ls[Ls.length - 1];
@@ -1103,7 +1114,9 @@ function buildPlateModel(font, p, withConnectors) {
   const totalLines = blocks.filter(B => B.kind === 'name').reduce((a, B) => a + B.lines.length, 0);
   let gi = 0;
   blocks.forEach((B, bi) => {
-    const tierW = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.tierW, 2 * tanA * d, 2 * p.pad) : 2 * tanA * d;
+    const isFirst = bi === 0 && B.kind === 'name';
+    const tierW = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.tierW, 2 * tanA * d, 2 * p.pad)
+      : (isFirst && p.firstW) ? p.firstW + 2 * p.pad : 2 * tanA * d;
     const w = Math.max(5, tierW - 2 * p.pad);
     const yT = y;
     let yy = yT - p.pad;
@@ -1119,6 +1132,7 @@ function buildPlateModel(font, p, withConnectors) {
       else {
         const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
         hLine = (p.hTop + (p.hBot - p.hTop) * tt) * (B.lines.length > 1 ? 0.8 : 1);
+        if (isFirst && p.firstH) hLine *= p.firstH / (p.hTop * (B.lines.length > 1 ? 0.8 : 1));
         gi++;
       }
       // não deixa a letra ficar mais que 2x mais larga nem 2,5x mais estreita que o normal
@@ -1126,7 +1140,7 @@ function buildPlateModel(font, p, withConnectors) {
       const ratio = spacingRatio(font, p.font, s);
       const bw0 = tb.bw / ratio;
       const natW = hLine * bw0 / tb.bh;
-      const lw0 = Math.min(w, natW * 2);
+      const lw0 = (isFirst && p.firstW) ? w : Math.min(w, natW * 2);
       const h = Math.min(hLine, lw0 * tb.bh / bw0 * 2.5);
       const lw = lw0 * ratio;
       maxLineW = Math.max(maxLineW, lw);
@@ -1276,7 +1290,7 @@ resize();
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
 
 // Medidas que crescem/encolhem com a altura total (espessuras, barras e encaixes ficam fixos)
-const SCALED = ['wTop', 'hTop', 'hBot', 'yearW', 'yearH', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
+const SCALED = ['wTop', 'hTop', 'hBot', 'firstW', 'firstH', 'yearW', 'yearH', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
 const modelHeight = (parts) => {
   let lo = Infinity, hi = -Infinity;
   for (const pt of parts) { lo = Math.min(lo, pt.geometry.boundingBox.min.y); hi = Math.max(hi, pt.geometry.boundingBox.max.y); }
