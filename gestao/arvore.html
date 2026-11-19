@@ -86,7 +86,7 @@
     <h1>🎄 Árvore de Nomes 3D</h1>
     <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
     <div class="head-row">
-      <span class="version" title="Versão do app">versão 1.2</span>
+      <span class="version" title="Versão do app">versão 1.3</span>
       <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
     </div>
   </header>
@@ -165,7 +165,14 @@
         <div><label>Ângulo da árvore (°)</label><input autocomplete="off" type="number" id="angle" value="25" min="10" max="45"></div>
         <div><label>Altura da letra no topo</label><input autocomplete="off" type="number" id="hTop" value="14" step="0.5" min="3"></div>
         <div><label>Altura da letra na base</label><input autocomplete="off" type="number" id="hBot" value="28" step="0.5" min="3"></div>
-        <div><label>Largura do ano</label><input autocomplete="off" type="number" id="yearW" value="50" min="5"></div>
+        <div><label>Largura do ano</label>
+          <select autocomplete="off" id="yearMode">
+            <option value="fixed" selected>Medida fixa (abaixo)</option>
+            <option value="upper">Igual ao nome de cima</option>
+            <option value="slope">Seguir a diagonal da árvore</option>
+          </select></div>
+        <div><label>Largura do ano (mm)</label><input autocomplete="off" type="number" id="yearW" value="50" min="5"></div>
+        <div><label>Altura do ano (mm)</label><input autocomplete="off" type="number" id="yearH" value="14" step="0.5" min="3"></div>
         <div><label>Diâmetro da estrela</label><input autocomplete="off" type="number" id="starSize" value="30" min="5"></div>
         <div class="only-cutout"><label>Espessura das barras</label><input autocomplete="off" type="number" id="t" value="1.5" step="0.1" min="0.6"></div>
         <div class="only-cutout"><label>Espessura (Z) no topo</label><input autocomplete="off" type="number" id="Dtop" value="10" step="1" min="3"></div>
@@ -306,7 +313,7 @@ function params() {
     gap: Math.max(0, n('gap')), lineGap: Math.max(0, n('lineGap')), pinD: Math.max(1.5, n('pinD')), pinH: Math.max(1, n('pinH')),
     font: fontSel.value, bold: Math.max(0, n('bold')), fatAccents: $('fatAccents').checked,
     accentBand: Math.min(0.6, Math.max(0.1, n('accentBand') / 100)), sideBars: $('sideBars').checked, trimBars: $('trimBars').checked,
-    wTop: Math.max(5, n('wTop')), angle: Math.min(45, Math.max(10, n('angle'))), yearW: n('yearW'),
+    wTop: Math.max(5, n('wTop')), angle: Math.min(45, Math.max(10, n('angle'))), yearW: n('yearW'), yearH: Math.max(3, n('yearH')), yearMode: $('yearMode').value,
     starSize: n('starSize'), mh: n('mh'), t: Math.max(0.6, n('t')),
     Dtop: Math.max(3, n('Dtop')), Dbot: Math.max(3, n('Dbot')), D: Math.max(3, n('Dtop'), n('Dbot')),
     pw: n('pw'), pl: n('pl'), tol: n('tol'), twoPegMin: n('twoPegMin'), explode: n('explode'),
@@ -722,7 +729,8 @@ function layeredSolid(polys, notches, jointY, p) {
   const out = [];
   const zc = p.D / 2;
   const A = notches.length ? Math.max(...notches.map(n => pocketHalf(n.s, p))) : 0;
-  const y0 = jointY - (p.pl + p.tol), OV = 0.02, N = 8;
+  // fatias de ~0,2 mm (uma camada de impressão): o degrau do encaixe fica do tamanho da camada
+  const y0 = jointY - (p.pl + p.tol), OV = 0.02, N = Math.max(8, Math.ceil(2 * A / 0.2));
   const bbox = (poly) => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const [x, y] of poly[0]) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); } return [a, b, c, d]; };
   for (const poly of polys) {
     const [bx0, bx1, by0, by1] = bbox(poly);
@@ -817,6 +825,14 @@ function starLegs(R) {
   return { minY, xr };
 }
 
+// Largura da linha do ano: medida fixa, igual à do nome de cima, ou seguindo a diagonal da árvore.
+// "extra" é o que a peça tem além do texto (a borda da placa no estilo placa).
+function yearWidth(p, upperW, slopeW, extra = 0) {
+  if (p.yearMode === 'upper' && upperW) return upperW;
+  if (p.yearMode === 'slope') return slopeW;
+  return p.yearW + extra;
+}
+
 // Monta a lista de peças (de cima para baixo)
 function buildModel(font, p, withConnectors) {
   let names = parseNames(p);
@@ -853,10 +869,10 @@ function buildModel(font, p, withConnectors) {
     let off = p.t;
     B.lines.forEach((s, j) => {
       const lineD = j === 0 ? d : d + off;
-      const lp = B.kind === 'year' ? p.yearW : 2 * tanA * lineD;
+      const lp = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.plateW, 2 * tanA * lineD) : 2 * tanA * lineD;
       const lw = Math.max(5, lp - 2 * p.mh - 2 * side);
       let h;
-      if (B.kind === 'year') h = p.hTop;
+      if (B.kind === 'year') h = p.yearH;
       else {
         const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
         h = (p.hTop + (p.hBot - p.hTop) * tt) * (k > 1 ? 0.8 : 1);
@@ -1087,7 +1103,7 @@ function buildPlateModel(font, p, withConnectors) {
   const totalLines = blocks.filter(B => B.kind === 'name').reduce((a, B) => a + B.lines.length, 0);
   let gi = 0;
   blocks.forEach((B, bi) => {
-    const tierW = B.kind === 'year' ? p.yearW + 2 * p.pad : 2 * tanA * d;
+    const tierW = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.tierW, 2 * tanA * d, 2 * p.pad) : 2 * tanA * d;
     const w = Math.max(5, tierW - 2 * p.pad);
     const yT = y;
     let yy = yT - p.pad;
@@ -1099,7 +1115,7 @@ function buildPlateModel(font, p, withConnectors) {
       if (tb.bw <= 0 || tb.bh <= 0) return;
       // altura cresce linha a linha: no nome composto, a linha de baixo fica maior
       let hLine;
-      if (B.kind === 'year') hLine = p.hTop;
+      if (B.kind === 'year') hLine = p.yearH;
       else {
         const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
         hLine = (p.hTop + (p.hBot - p.hTop) * tt) * (B.lines.length > 1 ? 0.8 : 1);
@@ -1260,7 +1276,7 @@ resize();
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
 
 // Medidas que crescem/encolhem com a altura total (espessuras, barras e encaixes ficam fixos)
-const SCALED = ['wTop', 'hTop', 'hBot', 'yearW', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
+const SCALED = ['wTop', 'hTop', 'hBot', 'yearW', 'yearH', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
 const modelHeight = (parts) => {
   let lo = Infinity, hi = -Infinity;
   for (const pt of parts) { lo = Math.min(lo, pt.geometry.boundingBox.min.y); hi = Math.max(hi, pt.geometry.boundingBox.max.y); }
