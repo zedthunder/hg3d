@@ -153,7 +153,15 @@
     if (tab === 'stock') renderStock();
     if (tab === 'settings') fillSettings();
     if (tab === 'gallery') openGallery();
+    if (tab === 'arvore') openArvore();
     window.scrollTo(0, 0);
+  }
+
+  /* ---------- árvore de nomes 3D ---------- */
+  // O gerador é pesado (3D): só carrega na primeira vez que a aba é aberta
+  function openArvore() {
+    const frame = $('#arvore-frame');
+    if (frame && !frame.src) frame.src = frame.dataset.src;
   }
 
   /* ---------- formulário do item ---------- */

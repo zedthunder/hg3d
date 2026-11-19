@@ -1,0 +1,1538 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Árvore de Nomes 3D</title>
+<style>
+  :root {
+    --bg: #17191d; --panel: #23262c; --panel2: #1b1d22; --line: #343842;
+    --text: #e9eaec; --muted: #9aa1ac; --accent: #2d8cff; --accent2: #1f6fd1; --accent-ink: #fff;
+    --btn: #2c3038; --btn-hover: #353a44; --on: #383d47; --float: rgba(35,38,44,.92); --err: #ff8080; --sw-border: rgba(255,255,255,.2);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; display: flex; overflow: hidden; }
+  aside { width: 390px; min-width: 330px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+  header { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 17px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .version { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .head-row button { padding: 5px 10px; font-size: 12px; }
+  .scroll { overflow: auto; padding: 4px 16px 16px; flex: 1; }
+  details { border-bottom: 1px solid var(--line); padding: 6px 0 10px; }
+  summary { cursor: pointer; font-weight: 600; padding: 6px 0; user-select: none; }
+  label { display: block; margin: 9px 0 3px; color: var(--muted); font-size: 12px; }
+  label b { color: var(--text); font-weight: 600; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 7px 8px; font: inherit;
+  }
+  textarea { resize: vertical; min-height: 92px; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .chk { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 2px; cursor: pointer; }
+  .chk input { margin-top: 3px; }
+  .chk small { display: block; color: var(--muted); font-size: 11.5px; }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .colors { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; align-items: center; }
+  .color-item { display: flex; align-items: center; gap: 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px; }
+  input[type=color] { width: 34px; height: 28px; padding: 0; border: none; background: none; cursor: pointer; }
+  .x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 4px; }
+  .x:hover { color: var(--err); }
+  button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 8px 10px; }
+  button:hover { background: var(--btn-hover); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.primary:hover { background: var(--accent2); }
+  .exports { padding: 12px 16px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .exports .title { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+  main { flex: 1; position: relative; min-width: 0; }
+  #view { position: absolute; inset: 0; }
+  .toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; }
+  .toolbar button { border: none; background: none; padding: 7px 14px; }
+  .toolbar button.on { background: var(--on); font-weight: 600; }
+  .info { position: absolute; left: 12px; bottom: 12px; background: var(--float); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; max-width: min(420px, calc(100% - 24px)); max-height: 45%; overflow: auto; font-size: 12.5px; }
+  .info .dims { font-weight: 600; margin-bottom: 6px; }
+  .info ul { margin: 0; padding: 0; list-style: none; }
+  .info li { display: flex; gap: 8px; align-items: center; padding: 2px 0; color: var(--muted); }
+  .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; border: 1px solid var(--sw-border); }
+  .status { position: absolute; right: 12px; bottom: 12px; color: var(--muted); font-size: 12px; background: var(--float); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  .status.err { color: var(--err); }
+  body.style-plate .only-cutout, body.style-cutout .only-plate { display: none; }
+  /* dentro do app de gestão: a aba já tem título, então o cabeçalho fica só com versão e "Voltar ao padrão" */
+  body.embed header h1, body.embed header > p { display: none; }
+  body.embed header { padding: 10px 16px; }
+  body.embed .head-row { margin-top: 0; }
+  @media (max-width: 820px) {
+    body { flex-direction: column; overflow: auto; }
+    aside { width: 100%; min-width: 0; border-right: none; }
+    main { min-height: 70vh; }
+  }
+</style>
+<!-- recorte de formas 2D (une letras e barras e abre os encaixes dos pinos) -->
+<script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<aside>
+  <header>
+    <h1>🎄 Árvore de Nomes 3D</h1>
+    <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
+    <div class="head-row">
+      <span class="version" title="Versão do app">versão 1.2</span>
+      <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
+    </div>
+  </header>
+  <div class="scroll" id="form">
+    <label><b>Estilo</b></label>
+    <select autocomplete="off" id="style">
+      <option value="cutout" selected>Letras vazadas (estilo MakerWorld)</option>
+      <option value="plate">Placa em pinheiro com nomes em relevo</option>
+    </select>
+    <details open>
+      <summary>Nomes</summary>
+      <label><b>Nomes</b> — um por linha ou separados por <code>*</code></label>
+      <textarea autocomplete="off" id="names">Ana*David*Maria Julia*Mamãe*Papai</textarea>
+      <label class="chk"><input autocomplete="off" type="checkbox" id="splitComposite" checked>
+        <span>Nomes compostos em duas linhas<small>“Maria Julia” vira duas linhas na mesma peça e mesma cor. Use <code>/</code> para escolher onde quebrar (ex.: <code>Ana/Clara</code>) mesmo com a opção desligada.</small></span></label>
+      <label class="chk"><input autocomplete="off" type="checkbox" id="upper" checked><span>Tudo em maiúsculas</span></label>
+      <label class="chk"><input autocomplete="off" type="checkbox" id="sortBySize"><span>Ordenar do menor para o maior nome</span></label>
+      <label><b>Ano</b> (deixe vazio para não ter)</label>
+      <input autocomplete="off" type="text" id="year" value="2026">
+      <label class="chk"><input autocomplete="off" type="checkbox" id="star" checked><span>Estrela no topo</span></label>
+    </details>
+
+    <details open>
+      <summary>Cores</summary>
+      <label><b>Cores dos nomes</b> (alternam de cima para baixo)</label>
+      <div class="colors" id="colorList"></div>
+      <div class="row">
+        <div><label><b>Cor do ano</b></label><input autocomplete="off" type="color" id="yearColor" value="#1e6b3a">
+          <label class="chk" style="margin-top:4px"><input autocomplete="off" type="checkbox" id="yearAuto" checked><span>Seguir alternância</span></label></div>
+        <div><label><b>Cor da estrela</b></label><input autocomplete="off" type="color" id="starColor" value="#ffc83d"></div>
+        <div class="only-plate"><label><b>Cor da placa</b></label><input autocomplete="off" type="color" id="plateColor" value="#1b6b34"></div>
+      </div>
+    </details>
+
+    <details open class="only-plate">
+      <summary>Placa em pinheiro (mm)</summary>
+      <div class="row">
+        <div><label>Espessura da placa</label><input autocomplete="off" type="number" id="P" value="4" step="0.5" min="1.5"></div>
+        <div><label>Altura das letras (relevo)</label><input autocomplete="off" type="number" id="L" value="6" step="0.5" min="2"></div>
+        <div><label>Borda da placa em volta</label><input autocomplete="off" type="number" id="pad" value="3" step="0.5" min="0.5"></div>
+        <div><label>Abertura dos galhos</label><input autocomplete="off" type="number" id="flare" value="7" step="0.5" min="0"></div>
+        <div><label>Espaço entre nomes</label><input autocomplete="off" type="number" id="gap" value="2" step="0.5" min="0"></div>
+        <div><label>Espaço entre linhas (composto)</label><input autocomplete="off" type="number" id="lineGap" value="1" step="0.5" min="0"></div>      </div>
+    </details>
+
+    <details>
+      <summary>Texto</summary>
+      <label><b>Fonte</b></label>
+      <select autocomplete="off" id="font"></select>
+      <label class="hint" style="cursor:pointer">ou carregar fonte própria (.ttf/.otf): <input autocomplete="off" type="file" id="fontFile" accept=".ttf,.otf,.woff"></label>
+      <label><b>Espaçamento entre letras</b> (% do tamanho da letra; negativo junta, positivo afasta)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input autocomplete="off" type="range" id="spacingRange" min="-20" max="40" step="1" value="0" style="flex:1">
+        <input autocomplete="off" type="number" id="spacing" value="0" step="1" min="-20" max="40" style="width:72px">
+      </div>
+      <div class="only-cutout"><label><b>Engrossar letras</b> (mm a mais em cada traço)</label>
+      <input autocomplete="off" type="number" id="bold" value="0.8" step="0.2" min="0">
+      <label class="chk"><input autocomplete="off" type="checkbox" id="fatAccents" checked><span>Acentos gordinhos e arredondados<small>A letra fica do tamanho normal e o acento grosso fica por cima, grudado na barra.</small></span></label>
+      <label>Altura do acento (% da altura da letra)</label>
+      <input autocomplete="off" type="number" id="accentBand" value="30" step="2" min="10" max="60">
+      <label class="chk"><input autocomplete="off" type="checkbox" id="trimBars" checked><span>Cortar as pontas das barras<small>A barra vai só até onde a letra encosta nela, sem sobrar ponta nos lados.</small></span></label>
+      <label class="chk"><input autocomplete="off" type="checkbox" id="sideBars"><span>Fechar as laterais (moldura quadrada)</span></label>
+      <div class="row">
+        <div><label>Barras além das letras (mm)</label><input autocomplete="off" type="number" id="mh" value="0" step="0.5" min="0"></div>
+      </div></div>
+    </details>
+
+    <details open>
+      <summary>Formato e tamanho (mm)</summary>
+      <p class="hint">A largura de cada nome segue a diagonal da árvore e a altura cresce de forma regular do topo para a base. As letras esticam para preencher, então nome curto ou comprido fica com a mesma altura daquela posição.</p>
+      <label><b>Altura total da árvore</b> (mm, da ponta da estrela até a base; vazio = automática)</label>
+      <input autocomplete="off" type="number" id="treeH" value="" placeholder="automática" min="20" step="5">
+      <p class="hint">Com altura total definida, as medidas abaixo viram proporções: o app aumenta ou diminui tudo junto até bater a altura. Espessuras, barras e encaixes não mudam.</p>
+      <div class="row">
+        <div><label>Largura do nome do topo</label><input autocomplete="off" type="number" id="wTop" value="40" min="5"></div>
+        <div><label>Ângulo da árvore (°)</label><input autocomplete="off" type="number" id="angle" value="25" min="10" max="45"></div>
+        <div><label>Altura da letra no topo</label><input autocomplete="off" type="number" id="hTop" value="14" step="0.5" min="3"></div>
+        <div><label>Altura da letra na base</label><input autocomplete="off" type="number" id="hBot" value="28" step="0.5" min="3"></div>
+        <div><label>Largura do ano</label><input autocomplete="off" type="number" id="yearW" value="50" min="5"></div>
+        <div><label>Diâmetro da estrela</label><input autocomplete="off" type="number" id="starSize" value="30" min="5"></div>
+        <div class="only-cutout"><label>Espessura das barras</label><input autocomplete="off" type="number" id="t" value="1.5" step="0.1" min="0.6"></div>
+        <div class="only-cutout"><label>Espessura (Z) no topo</label><input autocomplete="off" type="number" id="Dtop" value="10" step="1" min="3"></div>
+        <div class="only-cutout"><label>Espessura (Z) na base</label><input autocomplete="off" type="number" id="Dbot" value="20" step="1" min="3"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Conectores (peças separadas)</summary>
+      <p class="hint only-plate">A placa verde vira uma peça com pinos redondos. As letras de cada nome viram outra peça, com furos atrás que encaixam nos pinos; elas são exportadas de cara para baixo, para imprimir sem suporte. Acentos e pedacinhos pequenos demais para um furo precisam de uma gota de cola.</p>
+      <p class="hint only-cutout">Cada nome vira uma peça. A peça de cima tem pinos em losango no meio da espessura, que entram num encaixe fechado na barra e na letra da peça de baixo. Os pinos ficam onde as letras são cheias dos dois lados. O losango tem lados a 45°, então tudo imprime deitado sem suporte.</p>
+      <div class="row">
+        <div class="only-cutout"><label>Largura do pino (losango)</label><input autocomplete="off" type="number" id="pw" value="5" step="0.5" min="2"></div>
+        <div class="only-cutout"><label>Quanto o pino entra embaixo</label><input autocomplete="off" type="number" id="pl" value="4" step="0.5" min="1"></div>
+        <div><label>Folga do encaixe</label><input autocomplete="off" type="number" id="tol" value="0.2" step="0.05" min="0"></div>
+        <div class="only-cutout"><label>2 pinos a partir de (mm de largura)</label><input autocomplete="off" type="number" id="twoPegMin" value="55" min="10"></div>
+        <div class="only-plate"><label>Diâmetro do pino (placa)</label><input autocomplete="off" type="number" id="pinD" value="3" step="0.5" min="1.5"></div>
+        <div class="only-plate"><label>Altura do pino (placa)</label><input autocomplete="off" type="number" id="pinH" value="2.5" step="0.5" min="1"></div>
+        <div><label>Afastamento na visualização</label><input autocomplete="off" type="number" id="explode" value="14" min="0"></div>
+      </div>
+    </details>
+  </div>
+  <div class="exports">
+    <div class="title">Exportar</div>
+    <button class="primary" id="exAssembled3mf" title="Uma peça só, cada nome é um objeto colorido (AMS)">3MF montado (multicor)</button>
+    <button id="exAssembledStl" title="Modelo inteiro em um STL">STL montado</button>
+    <button class="primary" id="exParts3mf" title="Peças separadas com conectores, organizadas na mesa">3MF peças + conectores</button>
+    <button id="exPartsZip" title="ZIP com um STL por peça e um STL por cor">ZIP de STLs (peças)</button>
+  </div>
+</aside>
+
+<main>
+  <div id="view"></div>
+  <div class="toolbar">
+    <button id="vAssembled" class="on">Montado</button>
+    <button id="vParts">Peças separadas</button>
+    <button id="vFit" title="Centralizar a câmera de frente">⤢ Enquadrar</button>
+  </div>
+  <div class="info" id="info"></div>
+  <div class="status" id="status">Carregando…</div>
+</main>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
+import { Font } from 'three/addons/loaders/FontLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { zipSync, strToU8 } from 'three/addons/libs/fflate.module.js';
+
+// ---------------------------------------------------------------- fontes
+const GF = 'https://cdn.jsdelivr.net/gh/google/fonts@main/';
+const FONTS = {
+  'Lilita One': GF + 'ofl/lilitaone/LilitaOne-Regular.ttf',
+  'Titan One': GF + 'ofl/titanone/TitanOne-Regular.ttf',
+  'Anton': GF + 'ofl/anton/Anton-Regular.ttf',
+  'Bebas Neue': GF + 'ofl/bebasneue/BebasNeue-Regular.ttf',
+  'Archivo Black': GF + 'ofl/archivoblack/ArchivoBlack-Regular.ttf',
+  'Luckiest Guy': GF + 'apache/luckiestguy/LuckiestGuy-Regular.ttf',
+  'Lobster': GF + 'ofl/lobster/Lobster-Regular.ttf',
+};
+const fontCache = {};
+const $ = (id) => document.getElementById(id);
+const fontSel = $('font');
+for (const name of Object.keys(FONTS)) fontSel.add(new Option(name, name));
+
+async function getFont(name) {
+  if (fontCache[name]) return fontCache[name];
+  const res = await fetch(FONTS[name]);
+  if (!res.ok) throw new Error('Não consegui baixar a fonte ' + name);
+  const json = new TTFLoader().parse(await res.arrayBuffer());
+  return (fontCache[name] = new Font(json));
+}
+
+$('fontFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const json = new TTFLoader().parse(await f.arrayBuffer());
+    const key = 'Própria: ' + f.name;
+    fontCache[key] = new Font(json);
+    if (![...fontSel.options].some(o => o.value === key)) fontSel.add(new Option(key, key));
+    fontSel.value = key;
+    schedule();
+  } catch (err) { setStatus('Fonte inválida: ' + err.message, true); }
+});
+
+// estilo: troca a fonte sugerida e mostra só os campos daquele estilo
+function applyStyle(changeFont) {
+  const st = $('style').value;
+  document.body.classList.toggle('style-plate', st === 'plate');
+  document.body.classList.toggle('style-cutout', st === 'cutout');
+  if (changeFont) fontSel.value = st === 'plate' ? 'Lilita One' : 'Anton';
+}
+$('style').addEventListener('change', () => { applyStyle(true); firstFit = true; });
+applyStyle(true);
+
+// ---------------------------------------------------------------- cores
+const DEFAULT_COLORS = ['#1e6b3a', '#b3202a'];
+let nameColors = DEFAULT_COLORS.slice();
+function renderColors() {
+  const box = $('colorList');
+  box.innerHTML = '';
+  nameColors.forEach((c, i) => {
+    const item = document.createElement('div');
+    item.className = 'color-item';
+    const inp = document.createElement('input');
+    inp.type = 'color'; inp.value = c;
+    inp.addEventListener('input', () => { nameColors[i] = inp.value; schedule(); });
+    item.appendChild(inp);
+    if (nameColors.length > 1) {
+      const x = document.createElement('button');
+      x.className = 'x'; x.textContent = '×'; x.title = 'Remover cor';
+      x.onclick = () => { nameColors.splice(i, 1); renderColors(); schedule(); };
+      item.appendChild(x);
+    }
+    box.appendChild(item);
+  });
+  const add = document.createElement('button');
+  add.textContent = '+ cor';
+  add.onclick = () => { nameColors.push('#2a5db0'); renderColors(); schedule(); };
+  box.appendChild(add);
+}
+renderColors();
+
+// ---------------------------------------------------------------- parâmetros
+function params() {
+  const n = (id) => parseFloat($(id).value) || 0;
+  return {
+    names: $('names').value, splitComposite: $('splitComposite').checked, upper: $('upper').checked,
+    sortBySize: $('sortBySize').checked, year: $('year').value.trim(), star: $('star').checked,
+    colors: nameColors.slice(), yearColor: $('yearColor').value, yearAuto: $('yearAuto').checked, starColor: $('starColor').value,
+    style: $('style').value, plateColor: $('plateColor').value,
+    spacing: Math.min(40, Math.max(-20, n('spacing'))),
+    treeH: n('treeH') >= 20 ? n('treeH') : 0,
+    P: Math.max(1.5, n('P')), L: Math.max(2, n('L')), pad: Math.max(0.5, n('pad')), flare: Math.max(0, n('flare')),
+    hTop: Math.max(3, n('hTop')), hBot: Math.max(3, n('hBot')),
+    gap: Math.max(0, n('gap')), lineGap: Math.max(0, n('lineGap')), pinD: Math.max(1.5, n('pinD')), pinH: Math.max(1, n('pinH')),
+    font: fontSel.value, bold: Math.max(0, n('bold')), fatAccents: $('fatAccents').checked,
+    accentBand: Math.min(0.6, Math.max(0.1, n('accentBand') / 100)), sideBars: $('sideBars').checked, trimBars: $('trimBars').checked,
+    wTop: Math.max(5, n('wTop')), angle: Math.min(45, Math.max(10, n('angle'))), yearW: n('yearW'),
+    starSize: n('starSize'), mh: n('mh'), t: Math.max(0.6, n('t')),
+    Dtop: Math.max(3, n('Dtop')), Dbot: Math.max(3, n('Dbot')), D: Math.max(3, n('Dtop'), n('Dbot')),
+    pw: n('pw'), pl: n('pl'), tol: n('tol'), twoPegMin: n('twoPegMin'), explode: n('explode'),
+  };
+}
+
+// Divide "Maria da Graça" em duas linhas equilibradas
+function balanceTwo(words) {
+  let best = null;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(' '), b = words.slice(i).join(' ');
+    const score = Math.max(a.length, b.length);
+    if (!best || score < best.score) best = { score, lines: [a, b] };
+  }
+  return best.lines;
+}
+
+function parseNames(p) {
+  return p.names.split(/[*\n]+/).map(s => s.trim()).filter(Boolean).map(s => {
+    let lines;
+    if (s.includes('/')) lines = s.split('/').map(t => t.trim()).filter(Boolean);
+    else if (p.splitComposite && /\s/.test(s)) lines = balanceTwo(s.split(/\s+/));
+    else lines = [s];
+    return p.upper ? lines.map(l => l.toLocaleUpperCase('pt-BR')) : lines;
+  }).filter(l => l.length);
+}
+
+// ---------------------------------------------------------------- geometria
+function box(x0, x1, y0, y1, z0, z1) {
+  const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+  g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  return g;
+}
+
+// Espaçamento extra entre letras, em % do tamanho da fonte (definido no começo de cada geração)
+let SPACING = 0;
+
+// Igual a font.generateShapes(str, 100), mas com espaçamento entre letras ajustável
+function genShapes(font, str) {
+  if (!SPACING) return font.generateShapes(str, 100);
+  const data = font.data, scale = 100 / data.resolution;
+  const out = [];
+  let x = 0;
+  for (const ch of str) {
+    const g = data.glyphs[ch] || data.glyphs['?'];
+    if (!g) continue;
+    for (const s of font.generateShapes(ch, 100)) {
+      const ex = s.extractPoints(8);
+      const mv = (v) => new THREE.Vector2(v.x + x, v.y);
+      const ns = new THREE.Shape(ex.shape.map(mv));
+      ns.holes = ex.holes.map(h => new THREE.Path(h.map(mv)));
+      out.push(ns);
+    }
+    x += g.ha * scale + SPACING;
+  }
+  return out;
+}
+
+const textCache = new Map();
+function rawText(font, fontName, str) {
+  const key = fontName + '|' + SPACING + '|' + str;
+  if (!textCache.has(key)) {
+    const shapes = genShapes(font, str);
+    const g = new THREE.ExtrudeGeometry(shapes, { depth: 1, bevelEnabled: false, curveSegments: 8 });
+    g.computeBoundingBox();
+    textCache.set(key, g);
+  }
+  return textCache.get(key);
+}
+
+function textBox(font, fontName, str) {
+  const b = rawText(font, fontName, str).boundingBox;
+  return { minX: b.min.x, minY: b.min.y, bw: b.max.x - b.min.x, bh: b.max.y - b.min.y };
+}
+// Quanto a linha fica mais larga (ou mais estreita) por causa do espaçamento, sem mudar as letras
+function spacingRatio(font, fontName, str) {
+  if (!SPACING) return 1;
+  const tb = textBox(font, fontName, str);
+  const sp = SPACING;
+  SPACING = 0;
+  const tb0 = textBox(font, fontName, str);
+  SPACING = sp;
+  return tb0.bw > 0 ? tb.bw / tb0.bw : 1;
+}
+
+// Transformação que leva o texto bruto (fonte tamanho 100) para o retângulo (x0,y0,w,h)
+function textFit(font, fontName, str, x0, y0, w, h) {
+  const { minX, minY, bw, bh } = textBox(font, fontName, str);
+  if (bw <= 0 || bh <= 0) return null;
+  const sx = w / bw, sy = h / bh;
+  return {
+    str, sx, sy, x0, y0,
+    mapX: (x) => (x - minX) * sx + x0,
+    toRaw: (X, Y) => [(X - x0) / sx + minX, (Y - y0) / sy + minY],
+  };
+}
+
+function textGeom(font, fontName, fit, depth) {
+  const g = rawText(font, fontName, fit.str).clone();
+  const b = g.boundingBox;
+  const minX = b.min.x, minY = b.min.y; // o boundingBox muda com translate/scale, então guardo antes
+  g.translate(-minX, -minY, 0);
+  g.scale(fit.sx, fit.sy, depth);
+  g.translate(fit.x0, fit.y0, 0);
+  return g;
+}
+
+// Contornos das letras (para saber onde a letra é "cheia" e dá para ancorar um pino)
+const contourCache = new Map();
+function rawContours(font, fontName, str) {
+  const key = fontName + '|' + SPACING + '|' + str;
+  if (!contourCache.has(key)) {
+    contourCache.set(key, genShapes(font, str).map(s => {
+      const ex = s.extractPoints(8);
+      return { outer: ex.shape, holes: ex.holes };
+    }));
+  }
+  return contourCache.get(key);
+}
+function inPoly(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+function rawSolid(contours, x, y) {
+  return contours.some(c => inPoly(x, y, c.outer) && !c.holes.some(h => inPoly(x, y, h)));
+}
+
+// Estrela estilo emoji ⭐: gordinha, com pontas e cantos arredondados
+function starShape(cx, cy, R) {
+  const ri = R * 0.52;
+  const P = [];
+  for (let k = 0; k < 10; k++) {
+    const a = Math.PI / 2 + k * Math.PI / 5, rad = k % 2 ? ri : R;
+    P.push(new THREE.Vector2(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad));
+  }
+  const s = new THREE.Shape();
+  P.forEach((pt, k) => {
+    const prev = P[(k + 9) % 10], next = P[(k + 1) % 10];
+    const d = k % 2 ? R * 0.1 : R * 0.22; // raio do arredondado: pontas mais redondas que os cantos internos
+    const A = pt.clone().add(prev.clone().sub(pt).normalize().multiplyScalar(d));
+    const B = pt.clone().add(next.clone().sub(pt).normalize().multiplyScalar(d));
+    k ? s.lineTo(A.x, A.y) : s.moveTo(A.x, A.y);
+    s.quadraticCurveTo(pt.x, pt.y, B.x, B.y);
+  });
+  return s;
+}
+
+// ---------------------------------------------------------------- acentos gordinhos
+const MARKS = { '́': 'acute', '̀': 'grave', '̂': 'circ', '̃': 'tilde', '̈': 'uml', '̧': 'ced' };
+const TOP_MARKS = ['acute', 'grave', 'circ', 'tilde', 'uml'];
+
+// Separa "MAMÃE" em letras base "MAMAE" + lista de acentos por letra
+function splitAccents(str) {
+  const bases = [], marks = [];
+  for (const ch of str.normalize('NFC')) {
+    const d = ch.normalize('NFD');
+    bases.push(d[0]);
+    marks.push([...d.slice(1)].map(m => MARKS[m]).filter(Boolean));
+  }
+  return { base: bases.join(''), marks };
+}
+
+// Posição horizontal de cada letra, igual ao que Font.generateShapes faz
+function glyphSpans(font, str, size = 100) {
+  const data = font.data, scale = size / data.resolution;
+  let x = 0;
+  return [...str].map(ch => {
+    const g = data.glyphs[ch] || data.glyphs['?'];
+    if (!g) return null;
+    const span = (g.x_min == null || g.x_max == null) ? null : [x + g.x_min * scale, x + g.x_max * scale];
+    x += g.ha * scale + SPACING;
+    return span;
+  });
+}
+
+// Traço grosso com pontas redondas seguindo uma linha (pts), como uma caneta de ponta redonda
+function strokeShape(pts, r) {
+  const n = pts.length;
+  const segN = [];
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1][0] - pts[i][0], dy = pts[i + 1][1] - pts[i][1], L = Math.hypot(dx, dy) || 1;
+    segN.push([-dy / L, dx / L]);
+  }
+  const offs = pts.map((_, i) => {
+    if (i === 0) return segN[0];
+    if (i === n - 1) return segN[n - 2];
+    const a = segN[i - 1], c = segN[i];
+    let m = [a[0] + c[0], a[1] + c[1]];
+    const L = Math.hypot(m[0], m[1]) || 1;
+    m = [m[0] / L, m[1] / L];
+    const k = 1 / Math.max(0.35, m[0] * a[0] + m[1] * a[1]);
+    return [m[0] * k, m[1] * k];
+  });
+  const left = pts.map((q, i) => [q[0] + offs[i][0] * r, q[1] + offs[i][1] * r]);
+  const right = pts.map((q, i) => [q[0] - offs[i][0] * r, q[1] - offs[i][1] * r]);
+  const angEnd = Math.atan2(pts[n - 1][1] - pts[n - 2][1], pts[n - 1][0] - pts[n - 2][0]);
+  const angStart = Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]);
+  const s = new THREE.Shape();
+  s.moveTo(left[0][0], left[0][1]);
+  for (let i = 1; i < n; i++) s.lineTo(left[i][0], left[i][1]);
+  s.absarc(pts[n - 1][0], pts[n - 1][1], r, angEnd + Math.PI / 2, angEnd - Math.PI / 2, true);
+  for (let i = n - 2; i >= 0; i--) s.lineTo(right[i][0], right[i][1]);
+  s.absarc(pts[0][0], pts[0][1], r, angStart - Math.PI / 2, angStart - 1.5 * Math.PI, true);
+  return s;
+}
+
+// Desenha um acento dentro da faixa [yb, yt], encostando (e entrando "e") na letra e na barra
+function accentShapes(type, cx, gw, yb, yt, eTop, eBot) {
+  const band = yt - yb;
+  const r = type === 'tilde' ? band * 0.34 : type === 'ced' ? Math.min(band * 0.3, gw * 0.14) : Math.min(band * 0.34, gw * 0.22);
+  const lo = yb + r - eBot, hi = yt - r + eTop, mid = (lo + hi) / 2;
+  const aw = type === 'tilde' ? Math.max(gw * 0.9, r * 5.5) : gw * 0.85;
+  // polilinha = várias cápsulas (segmentos com pontas redondas) sobrepostas
+  const poly = (pts) => pts.slice(1).map((q, i) => strokeShape([pts[i], q], r));
+  switch (type) {
+    case 'tilde': {
+      // faixa ondulada: curva de cima e de baixo deslocadas na vertical (nunca se cruzam), pontas redondas
+      // onda suave (amplitude limitada) e sempre encostada na barra de cima
+      const x0 = cx - aw / 2 + r, x1 = cx + aw / 2 - r, A = Math.min((hi - lo) / 2, r * 0.8), N = 32;
+      const yc = (u) => hi - A + A * Math.sin(2 * Math.PI * u);
+      const s = new THREE.Shape();
+      for (let i = 0; i <= N; i++) { const u = i / N, x = x0 + (x1 - x0) * u; i ? s.lineTo(x, yc(u) + r) : s.moveTo(x, yc(u) + r); }
+      s.absarc(x1, yc(1), r, Math.PI / 2, -Math.PI / 2, true);
+      for (let i = N; i >= 0; i--) { const u = i / N; s.lineTo(x0 + (x1 - x0) * u, yc(u) - r); }
+      s.absarc(x0, yc(0), r, -Math.PI / 2, -1.5 * Math.PI, true);
+      return [s];
+    }
+    case 'acute': return poly([[cx - aw * 0.12, lo], [cx + aw * 0.18, hi]]);
+    case 'grave': return poly([[cx + aw * 0.12, lo], [cx - aw * 0.18, hi]]);
+    case 'circ': return poly([[cx - aw * 0.3, lo], [cx, hi], [cx + aw * 0.3, lo]]);
+    case 'uml': return [...poly([[cx - aw * 0.22, lo], [cx - aw * 0.22, hi]]), ...poly([[cx + aw * 0.22, lo], [cx + aw * 0.22, hi]])];
+    case 'ced': return poly([[cx, hi], [cx, mid], [cx + aw * 0.12, (mid + lo) / 2], [cx - aw * 0.15, lo]]);
+  }
+  return [];
+}
+
+// Prepara uma linha de texto com largura w: altura sai da proporção das letras
+function makeLine(font, p, str, w, letterH) {
+  const b = Math.min(p.bold, w * 0.1);
+  let base = str, marks = null;
+  if (p.fatAccents) ({ base, marks } = splitAccents(str));
+  const tb = textBox(font, p.font, base);
+  if (tb.bw <= 0 || tb.bh <= 0) return null;
+  const hasTop = !!marks && marks.some(m => m.some(t => TOP_MARKS.includes(t)));
+  const hasCed = !!marks && marks.some(m => m.includes('ced'));
+  return {
+    str, base, marks, b, w, letterH, hasTop, hasCed,
+    accH: hasTop ? letterH * p.accentBand : 0,          // faixa do acento, ACIMA da letra (a letra não encolhe)
+    cedH: hasCed ? letterH * p.accentBand * 0.7 : 0,     // faixa da cedilha, abaixo
+  };
+}
+
+// Geometria de uma linha já posicionada (L.yLetter = base das letras)
+function lineGeoms(font, p, L, e) {
+  const out = [];
+  const x0 = -L.w / 2;
+  // letras: entram "e" na barra de cima, a base só encosta (não invade a peça de baixo)
+  const fit = textFit(font, p.font, L.base, x0, L.yLetter, L.w - L.b, L.letterH + (L.hasTop ? 0 : e));
+  if (!fit) return out;
+  L.fit = fit;
+  const g = textGeom(font, p.font, fit, p.D);
+  out.push(g);
+  // engrossar: segunda cópia deslocada na horizontal (o fatiador une as duas)
+  if (L.b > 0) { const g2 = g.clone(); g2.translate(L.b, 0, 0); out.push(g2); }
+  if (L.marks && (L.hasTop || L.hasCed)) {
+    const spans = glyphSpans(font, L.base);
+    L.marks.forEach((list, i) => {
+      const sp = spans[i];
+      if (!sp || !list.length) return;
+      const ax0 = fit.mapX(sp[0]), ax1 = fit.mapX(sp[1]);
+      const cx = (ax0 + ax1) / 2 + L.b / 2, gw = ax1 - ax0 + L.b;
+      const yTopLetter = L.yLetter + L.letterH;
+      for (const t of list) {
+        const shapes = t === 'ced'
+          ? accentShapes(t, cx, gw, L.yCedBot, L.yLetter, e, 0)
+          : accentShapes(t, cx, gw, yTopLetter, yTopLetter + L.accH, e, e);
+        shapes.forEach(s => out.push(new THREE.ExtrudeGeometry(s, { depth: p.D, bevelEnabled: false, curveSegments: 10 })));
+      }
+    });
+  }
+  return out;
+}
+
+// Junta as geometrias e afunila a espessura: z' = z * D(y) / D  (trás reta em z=0, frente inclinada)
+function finalize(geoms, taper) {
+  const gs = geoms.filter(Boolean).map(g => {
+    const q = g.index ? g.toNonIndexed() : g;
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', q.getAttribute('position').clone());
+    return out;
+  });
+  const m = mergeGeometries(gs, false);
+  if (taper) {
+    const a = m.getAttribute('position').array;
+    for (let i = 0; i < a.length; i += 3) a[i + 2] *= taper(a[i + 1]);
+  }
+  m.computeVertexNormals();
+  m.computeBoundingBox();
+  return m;
+}
+
+// ---------------------------------------------------------------- encaixes (peças separadas)
+// Pino em losango no MEIO da espessura, entrando num encaixe fechado na peça de baixo.
+// Os lados a 45° deixam pino e encaixe imprimirem deitados sem suporte.
+
+// polygon-clipping (carregado por <script>) une as formas 2D e recorta os encaixes
+const PC = () => window.polygonClipping;
+
+function ringOf(pts) {
+  const r = [];
+  for (const v of pts) {
+    const x = v.x ?? v[0], y = v.y ?? v[1];
+    const l = r[r.length - 1];
+    if (!l || Math.abs(l[0] - x) > 1e-6 || Math.abs(l[1] - y) > 1e-6) r.push([x, y]);
+  }
+  if (r.length && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1])) r.push([r[0][0], r[0][1]]);
+  return r.length >= 4 ? r : null;
+}
+function shapePoly(shape, segs = 10) {
+  const ex = shape.extractPoints(segs);
+  const outer = ringOf(ex.shape);
+  if (!outer) return null;
+  return [outer, ...ex.holes.map(ringOf).filter(Boolean)];
+}
+const rectPoly = (x0, x1, y0, y1) => [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]];
+
+// Formas 2D de uma linha (letras + cópia engrossada + acentos), no mesmo lugar que lineGeoms desenha
+function linePolys(font, p, L, e) {
+  const out = [];
+  const x0 = -L.w / 2;
+  const fit = textFit(font, p.font, L.base, x0, L.yLetter, L.w - L.b, L.letterH + (L.hasTop ? 0 : e));
+  if (!fit) return out;
+  const tb = textBox(font, p.font, L.base);
+  const shapes = genShapes(font, L.base);
+  for (const dx of (L.b > 0 ? [0, L.b] : [0])) {
+    for (const s of shapes) {
+      const ex = s.extractPoints(8);
+      const T = (v) => [(v.x - tb.minX) * fit.sx + x0 + dx, (v.y - tb.minY) * fit.sy + L.yLetter];
+      const outer = ringOf(ex.shape.map(T));
+      if (outer) out.push([outer, ...ex.holes.map(h => ringOf(h.map(T))).filter(Boolean)]);
+    }
+  }
+  if (L.marks && (L.hasTop || L.hasCed)) {
+    const spans = glyphSpans(font, L.base);
+    L.marks.forEach((list, i) => {
+      const sp = spans[i];
+      if (!sp || !list.length) return;
+      const ax0 = fit.mapX(sp[0]), ax1 = fit.mapX(sp[1]);
+      const cx = (ax0 + ax1) / 2 + L.b / 2, gw = ax1 - ax0 + L.b;
+      const yTopLetter = L.yLetter + L.letterH;
+      for (const t of list) {
+        const shp = t === 'ced'
+          ? accentShapes(t, cx, gw, L.yCedBot, L.yLetter, e, 0)
+          : accentShapes(t, cx, gw, yTopLetter, yTopLetter + L.accH, e, e);
+        shp.forEach(sh => { const pl = shapePoly(sh); if (pl) out.push(pl); });
+      }
+    });
+  }
+  return out;
+}
+
+// Tira pontos quase colados (sobra da união das formas), que viram triângulos degenerados na malha
+function cleanRing(r) {
+  const pts = [];
+  for (const [x, y] of r.slice(0, -1)) {
+    const l = pts[pts.length - 1];
+    if (!l || Math.hypot(l.x - x, l.y - y) > 0.01) pts.push(new THREE.Vector2(x, y));
+  }
+  while (pts.length > 1 && pts[0].distanceTo(pts[pts.length - 1]) <= 0.01) pts.pop();
+  // pontos alinhados no meio de um trecho reto geram triângulos achatados e costuras abertas
+  let changed = true;
+  while (changed && pts.length > 3) {
+    changed = false;
+    for (let i = 0; i < pts.length && pts.length > 3; i++) {
+      const a = pts[(i + pts.length - 1) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
+      const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      const between = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) > 0;
+      if (Math.abs(cross) < 1e-6 * Math.max(1, a.distanceTo(c)) && between) { pts.splice(i, 1); changed = true; i--; }
+    }
+  }
+  return pts.length >= 3 ? pts : null;
+}
+function mpShapes(mp) {
+  const out = [];
+  for (const poly of mp) {
+    const outer = cleanRing(poly[0]);
+    if (!outer) continue;
+    const s = new THREE.Shape(outer);
+    s.holes = poly.slice(1).map(cleanRing).filter(Boolean).map(h => new THREE.Path(h));
+    out.push(s);
+  }
+  return out;
+}
+// Extruda de z0 a z1. "ov" faz a camada invadir um pouquinho a vizinha: camadas sobrepostas
+// (em vez de encostadas face com face) não geram arestas ruins no fatiador
+function extrudeMP(mp, z0, z1, ov = 0) {
+  if (z1 - z0 <= 1e-6 || !mp.length) return [];
+  const a = z0 - ov, b = z1 + ov;
+  return [new THREE.ExtrudeGeometry(mpShapes(mp), { depth: b - a, bevelEnabled: false, curveSegments: 1 }).translate(0, 0, a)];
+}
+
+// Meia-diagonal do encaixe (losango do pino + folga)
+const pocketHalf = (s, p) => s + p.tol * 1.5;
+
+// Extruda a peça. Cada forma (letra, barra, acento) é um sólido fechado próprio, como no modo montado;
+// só as formas que o encaixe atravessa são feitas em camadas, com o encaixe em losango (escadinha)
+// aberto só na borda de cima. Recortar forma por forma (sem unir tudo) evita costuras abertas na malha.
+function layeredSolid(polys, notches, jointY, p) {
+  const out = [];
+  const zc = p.D / 2;
+  const A = notches.length ? Math.max(...notches.map(n => pocketHalf(n.s, p))) : 0;
+  const y0 = jointY - (p.pl + p.tol), OV = 0.02, N = 8;
+  const bbox = (poly) => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const [x, y] of poly[0]) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); } return [a, b, c, d]; };
+  for (const poly of polys) {
+    const [bx0, bx1, by0, by1] = bbox(poly);
+    // essa forma é atravessada por algum encaixe?
+    const hit = notches.filter(n => { const h = pocketHalf(n.s, p); return bx1 > n.x - h && bx0 < n.x + h && by1 > y0 && by0 < jointY; });
+    if (!hit.length) { out.push(...extrudeMP([poly], 0, p.D)); continue; }
+    out.push(new THREE.ExtrudeGeometry(mpShapes([poly]), { depth: zc - A + OV, bevelEnabled: false, curveSegments: 1 }));
+    for (let i = 0; i < N; i++) {
+      const z0 = zc - A + 2 * A * i / N, z1 = zc - A + 2 * A * (i + 1) / N;
+      const minDz = (z0 <= zc && z1 >= zc) ? 0 : Math.min(Math.abs(z0 - zc), Math.abs(z1 - zc));
+      const rects = [];
+      for (const n of hit) {
+        const hw = pocketHalf(n.s, p) - minDz;
+        if (hw > 0.05) rects.push(rectPoly(n.x - hw, n.x + hw, y0, jointY + 1));
+      }
+      out.push(...extrudeMP(rects.length ? PC().difference(poly, ...rects) : [poly], z0, z1, OV));
+    }
+    out.push(...extrudeMP([poly], zc + A - OV, p.D));
+  }
+  return out;
+}
+
+// Pino em losango ao longo de Y, centrado na espessura
+function diamondPeg(x, s, y0, y1, p) {
+  const d = s * Math.SQRT2;
+  return new THREE.BoxGeometry(d, y1 - y0, d).rotateY(Math.PI / 4).translate(x, (y0 + y1) / 2, p.D / 2);
+}
+
+// Teste "a letra é cheia aqui?" com a base das letras em y=0
+function solidRel(font, p, L) {
+  const cont = rawContours(font, p.font, L.base);
+  const fit = textFit(font, p.font, L.base, -L.w / 2, 0, L.w - L.b, L.letterH);
+  if (!fit) return () => false;
+  return (X, Y) => [0, L.b].some(dx => { const [rx, ry] = fit.toRaw(X - dx, Y); return rawSolid(cont, rx, ry); });
+}
+
+// Escolhe onde colocar os pinos de uma emenda: onde a letra de cima E a de baixo são cheias
+function jointSpots(font, p, up, lo, s) {
+  const a = pocketHalf(s, p);
+  const upEmbed = Math.min(3, up.Ls[up.Ls.length - 1].letterH * 0.4);
+  const upSolid = up.bottom ? null : solidRel(font, p, up.Ls[up.Ls.length - 1]);
+  const L0 = lo.Ls[0];
+  const below = p.pl + p.tol + 1 - lo.tTop; // quanto o encaixe entra na letra, abaixo da barra
+  const loSolid = (L0.hasTop || below <= 0) ? null : solidRel(font, p, L0);
+  const score = (x) => {
+    let ok = 0, tot = 0;
+    if (upSolid) for (const X of [x - s - 0.3, x - s / 2, x, x + s / 2, x + s + 0.3])
+      for (const Y of [0.4, upEmbed / 2, upEmbed]) { tot++; if (upSolid(X, Y)) ok++; }
+    if (loSolid) for (const X of [x - a - 0.8, x - a / 2, x, x + a / 2, x + a + 0.8])
+      for (const Y of [L0.letterH - 0.3, L0.letterH - below / 2, L0.letterH - below]) { tot++; if (loSolid(X, Y)) ok++; }
+    return tot ? ok / tot : 1;
+  };
+  const lo0 = Math.max(up.anchorRange[0], lo.barTop[0]) + a + 1, hi0 = Math.min(up.anchorRange[1], lo.barTop[1]) - a - 1;
+  if (hi0 < lo0) return [(lo0 + hi0) / 2];
+  const c = (lo0 + hi0) / 2, ov = hi0 - lo0 + 2 * (a + 1);
+  const targets = ov >= p.twoPegMin ? [c - ov / 4, c + ov / 4] : [c];
+  const cands = [];
+  for (let x = lo0; x <= hi0; x += 0.25) cands.push({ x, sc: score(x) });
+  const chosen = [];
+  for (const t of targets) {
+    let best = null;
+    for (const cd of cands) {
+      if (chosen.some(q => Math.abs(q - cd.x) < 2 * a + 3)) continue;
+      const v = cd.sc * 100 - Math.abs(cd.x - t) * 0.5;
+      if (!best || v > best.v) best = { x: cd.x, v };
+    }
+    if (best) chosen.push(best.x);
+  }
+  return chosen.length ? chosen : [c];
+}
+
+// Até onde as letras vão (x mínimo e máximo) numa altura relY acima da base das letras
+function rowExtent(font, p, L, relY) {
+  const cont = rawContours(font, p.font, L.base);
+  const fit = textFit(font, p.font, L.base, -L.w / 2, 0, L.w - L.b, L.letterH);
+  const full = [-L.w / 2, L.w / 2];
+  if (!fit) return full;
+  const solid = (X) => [0, L.b].some(dx => { const [rx, ry] = fit.toRaw(X - dx, relY); return rawSolid(cont, rx, ry); });
+  let xl = null, xr = null;
+  for (let X = -L.w / 2 - 0.5; X <= L.w / 2 + 0.5; X += 0.2) if (solid(X)) { if (xl === null) xl = X; xr = X; }
+  return xl === null ? full : [xl - 0.2, xr + 0.2];
+}
+const union = (a, b) => (!a ? b : !b ? a : [Math.min(a[0], b[0]), Math.max(a[1], b[1])]);
+const grow = (r, m) => [r[0] - m, r[1] + m];
+
+// Pontos mais baixos da estrela (as "perninhas"): y do ponto mais baixo e x de cada perna
+function starLegs(R) {
+  const pts = starShape(0, 0, R).extractPoints(12).shape;
+  const minY = Math.min(...pts.map(v => v.y));
+  const low = pts.filter(v => v.y < minY + R * 0.04 && v.x > 0);
+  const xr = low.reduce((a, v) => a + v.x, 0) / low.length;
+  return { minY, xr };
+}
+
+// Monta a lista de peças (de cima para baixo)
+function buildModel(font, p, withConnectors) {
+  let names = parseNames(p);
+  if (p.sortBySize) names.sort((a, b) => Math.max(...a.map(s => s.length)) - Math.max(...b.map(s => s.length)));
+  const n = names.length;
+  const tanA = Math.tan(p.angle * Math.PI / 180);
+  // barra de baixo (quando existe) fica um pouco mais grossa nas peças separadas, para segurar o pino
+  const tBotB = withConnectors ? Math.max(p.t, 2.5) : p.t;
+  const side = p.sideBars ? p.t : 0;
+  if (withConnectors && !PC()) throw new Error('Não carregou a biblioteca de recorte (precisa de internet).');
+
+  const blocks = names.map((lines, i) => {
+    const ci = i % p.colors.length;
+    return { kind: 'name', label: lines.join(' '), lines, color: p.colors[ci], colorKey: 'cor' + (ci + 1) };
+  });
+  if (p.year) {
+    const ci = n % p.colors.length;
+    const auto = p.yearAuto && p.colors.length > 1;
+    const yr = p.upper ? p.year.toLocaleUpperCase('pt-BR') : p.year;
+    blocks.push({ kind: 'year', label: yr, lines: [yr], color: auto ? p.colors[ci] : p.yearColor, colorKey: auto ? 'cor' + (ci + 1) : 'ano' });
+  }
+
+  // ---- layout de cima para baixo. d = distância do vértice da pirâmide até o topo do bloco
+  let d = p.wTop / (2 * tanA);
+  let y = 0; // vai ficando negativo; no fim tudo é deslocado para a base ficar em y=0
+  const built = [];
+  // a altura cresce LINHA a LINHA (não nome a nome): num nome composto, a linha de baixo já fica maior
+  const totalLines = blocks.filter(B => B.kind === 'name').reduce((a, B) => a + B.lines.length, 0);
+  let gi = 0;
+  blocks.forEach((B, bi) => {
+    const k = B.lines.length;
+    // cada linha: largura pela diagonal na altura em que ela começa, altura pela posição na árvore
+    const Ls = [];
+    let off = p.t;
+    B.lines.forEach((s, j) => {
+      const lineD = j === 0 ? d : d + off;
+      const lp = B.kind === 'year' ? p.yearW : 2 * tanA * lineD;
+      const lw = Math.max(5, lp - 2 * p.mh - 2 * side);
+      let h;
+      if (B.kind === 'year') h = p.hTop;
+      else {
+        const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
+        h = (p.hTop + (p.hBot - p.hTop) * tt) * (k > 1 ? 0.8 : 1);
+        gi++;
+      }
+      // espaçamento só muda o vão entre as letras: a largura de cada letra fica igual à do espaçamento 0
+      const ratio = spacingRatio(font, p.font, p.fatAccents ? splitAccents(s).base : s);
+      const b0 = Math.min(p.bold, lw * 0.1);
+      const L = makeLine(font, p, s, (lw - b0) * ratio + b0, h);
+      if (!L) return;
+      L.plateW = ratio === 1 ? lp : L.w + 2 * p.mh + 2 * side;
+      Ls.push(L);
+      off += L.accH + L.letterH + (j < k - 1 ? L.cedH + p.t : 0);
+    });
+    if (!Ls.length) return;
+    const last = Ls[Ls.length - 1];
+    const plateW = last.plateW, w = last.w; // largura do bloco = a da linha mais larga (a de baixo)
+    const upper = built[built.length - 1];
+    // largura das barras: inteira, ou cortada até onde tem letra (sem as "pontas" sobrando)
+    Ls.forEach(L => { L.extTop = rowExtent(font, p, L, L.letterH - 0.5); L.extBot = rowExtent(font, p, L, 0.5); });
+    const fullW = (ww) => [-ww / 2, ww / 2];
+    const trim = p.trimBars && !p.sideBars;
+    // barra de cima: também segura a base das letras do nome de cima, então cobre a largura dele
+    const barTop = trim
+      ? grow(union(Ls[0].extTop, upper ? upper.anchorRange : null), p.mh)
+      : fullW(Math.max(Ls[0].plateW, upper ? upper.plateW : 0));
+    const midRanges = Ls.slice(0, -1).map((L, j) => trim ? grow(union(L.extBot, Ls[j + 1].extTop), p.mh) : fullW(Ls[j + 1].plateW));
+    const barBot = trim ? grow(last.extBot, p.mh) : fullW(plateW);
+    const isLast = bi === blocks.length - 1;
+    // barra de baixo só quando precisa: letra com acento em cima não encosta na barra de cima,
+    // então ela precisa de apoio embaixo (na peça separada ou na última linha)
+    const bottom = last.hasTop && (withConnectors || isLast || last.hasCed);
+    // barra de cima: nas peças separadas o encaixe entra nela e na letra de baixo; quando embaixo da barra
+    // só tem acento (ou a estrela apoia nela), a barra engrossa para o encaixe caber inteiro nela
+    const tTop = withConnectors && (Ls[0].hasTop || (bi === 0 && p.star)) ? Math.max(p.t, p.pl + p.tol + 1.2) : p.t;
+    // posições verticais
+    const top = y;
+    y -= tTop; // barra de cima
+    const mids = [];
+    Ls.forEach((L, j) => {
+      y -= L.accH;
+      y -= L.letterH;
+      L.yLetter = y;
+      if (j < Ls.length - 1) {
+        y -= L.cedH; L.yCedBot = y;
+        mids.push(y); y -= p.t; // barra do meio (nome composto)
+      }
+    });
+    const yLetterBottom = y;
+    if (bottom) y -= tBotB;
+    const yAnchor = y; // fundo do que é sólido (letras ou barra de baixo)
+    if (last.cedH) { y -= last.cedH; last.yCedBot = y; }
+    const anchorRange = bottom ? barBot : last.extBot;
+    built.push({ ...B, Ls, w, plateW, top, tTop, bottom, mids, yLetterBottom, yAnchor, yBot: y, barTop, midRanges, barBot, anchorRange });
+    d += top - y;
+  });
+
+  const shift = -y;
+  const sh = (v) => v + shift;
+  for (const c of built) {
+    for (const k of ['top', 'yLetterBottom', 'yAnchor', 'yBot']) c[k] = sh(c[k]);
+    c.mids = c.mids.map(sh);
+    c.Ls.forEach(L => { L.yLetter = sh(L.yLetter); if (L.yCedBot !== undefined) L.yCedBot = sh(L.yCedBot); });
+  }
+
+  const e = Math.min(0.3, p.t / 2);
+  const chain = [];
+  if (p.star && built.length) {
+    // estrela sem haste: só as perninhas encostam (e entram "e") na barra do primeiro nome
+    const R = p.starSize / 2, top = built[0].top;
+    const { minY, xr } = starLegs(R);
+    const pegS = Math.max(1, Math.min(p.pw / 2, R * 0.12)); // perninha da estrela é fina: pino menor
+    chain.push({ kind: 'star', label: 'Estrela', color: p.starColor, colorKey: 'estrela', R, cy: top - minY - e, legX: xr, pegS, yAnchor: top, embed: 2.5, yBot: top });
+    built[0].barTop = union(built[0].barTop, [-xr - 2 * pegS, xr + 2 * pegS]);
+  }
+  chain.push(...built);
+  chain.forEach(c => { c.pegs = []; c.notches = []; });
+
+  if (withConnectors) {
+    for (let i = 0; i < chain.length - 1; i++) {
+      const up = chain[i], lo = chain[i + 1];
+      let xs, s = p.pw / 2;
+      if (up.kind === 'star') { xs = [-up.legX, up.legX]; s = up.pegS; }
+      else {
+        xs = jointSpots(font, p, up, lo, s);
+        // quanto o pino entra na peça de cima: na barra de baixo dela, ou na letra
+        up.embed = up.bottom ? tBotB - 0.3 : Math.min(3, up.Ls[up.Ls.length - 1].letterH * 0.4);
+      }
+      xs.forEach(x => { up.pegs.push({ x, s }); lo.notches.push({ x, s }); });
+    }
+  }
+
+  // espessura afunilada: fina no topo, grossa na base
+  const yMax = chain.length && chain[0].kind === 'star' ? chain[0].cy + chain[0].R : (built[0] ? built[0].top : 1);
+  const taper = (yy) => (p.Dbot + (p.Dtop - p.Dbot) * Math.min(1, Math.max(0, yy / yMax))) / p.D;
+
+  return chain.map((c, order) => {
+    let geoms = [];
+    if (!withConnectors) {
+      // peça montada: extrusões simples (mais rápido)
+      if (c.kind === 'star') {
+        geoms.push(new THREE.ExtrudeGeometry(starShape(0, c.cy, c.R), { depth: p.D, bevelEnabled: false, curveSegments: 10 }));
+      } else {
+        const x0 = -c.plateW / 2, x1 = c.plateW / 2;
+        geoms.push(box(c.barTop[0], c.barTop[1], c.top - c.tTop, c.top, 0, p.D));                          // barra de cima
+        c.mids.forEach((m, j) => geoms.push(box(c.midRanges[j][0], c.midRanges[j][1], m - p.t, m, 0, p.D))); // barra do meio
+        if (c.bottom) geoms.push(box(c.barBot[0], c.barBot[1], c.yAnchor, c.yLetterBottom, 0, p.D));     // barra de baixo (só se precisar)
+        if (p.sideBars) {
+          geoms.push(box(x0, x0 + p.t, c.yAnchor, c.top, 0, p.D));
+          geoms.push(box(x1 - p.t, x1, c.yAnchor, c.top, 0, p.D));
+        }
+        c.Ls.forEach(L => geoms.push(...lineGeoms(font, p, L, e)));
+      }
+    } else {
+      // peça separada: formas 2D de cada letra/barra; o encaixe é recortado no meio da espessura, em camadas
+      const polys = [];
+      if (c.kind === 'star') polys.push(shapePoly(starShape(0, c.cy, c.R)));
+      else {
+        const x0 = -c.plateW / 2, x1 = c.plateW / 2;
+        polys.push(rectPoly(c.barTop[0], c.barTop[1], c.top - c.tTop, c.top));
+        c.mids.forEach((m, j) => polys.push(rectPoly(c.midRanges[j][0], c.midRanges[j][1], m - p.t, m)));
+        if (c.bottom) polys.push(rectPoly(c.barBot[0], c.barBot[1], c.yAnchor, c.yLetterBottom));
+        if (p.sideBars) { polys.push(rectPoly(x0, x0 + p.t, c.yAnchor, c.top)); polys.push(rectPoly(x1 - p.t, x1, c.yAnchor, c.top)); }
+        c.Ls.forEach(L => polys.push(...linePolys(font, p, L, e)));
+      }
+      geoms = layeredSolid(polys.filter(Boolean), c.notches, c.top, p);
+      // pino: sai do fundo da peça (entrando c.embed nela), atravessa a faixa da cedilha e entra no encaixe de baixo
+      for (const { x, s } of c.pegs) geoms.push(diamondPeg(x, s, c.yBot - p.pl, c.yAnchor + (c.embed || 2), p));
+    }
+    const geometry = finalize(geoms, taper);
+    return { order, kind: c.kind, label: c.label, color: c.color, colorKey: c.colorKey, geometry };
+  });
+}
+
+// ================================================================ estilo "placa em pinheiro"
+
+// Contornos do texto já transformados para o mundo (pontos), um item por "ilha" (letra, acento...)
+function worldIslands(font, fontName, str, fit) {
+  const tb = textBox(font, fontName, str);
+  const T = (v) => new THREE.Vector2((v.x - tb.minX) * fit.sx + fit.x0, (v.y - tb.minY) * fit.sy + fit.y0);
+  return genShapes(font, str).map(s => {
+    const ex = s.extractPoints(8);
+    return { outer: ex.shape.map(T), holes: ex.holes.map(h => h.map(T)) };
+  });
+}
+
+function islandShape(isl, extraHoles = []) {
+  const s = new THREE.Shape(isl.outer);
+  s.holes = isl.holes.map(h => new THREE.Path(h));
+  for (const c of extraHoles) s.holes.push(new THREE.Path().absarc(c.x, c.y, c.r, 0, Math.PI * 2, true));
+  return s;
+}
+
+function distToSeg(px, py, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1e-9;
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / L2));
+  return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+}
+
+// Pontos mais "no meio" da ilha, onde cabe um furo de raio minClear (até maxPins pontos)
+function bestPinSpots(isl, minClear, maxPins, minSep) {
+  const xs = isl.outer.map(v => v.x), ys = isl.outer.map(v => v.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (Math.min(x1 - x0, y1 - y0) < 2 * minClear) return [];
+  const rings = [isl.outer, ...isl.holes];
+  const clear = (x, y) => {
+    if (!inPoly(x, y, isl.outer) || isl.holes.some(h => inPoly(x, y, h))) return -1;
+    let d = Infinity;
+    for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) d = Math.min(d, distToSeg(x, y, r[i], r[j]));
+    return d;
+  };
+  const step = Math.max(0.5, Math.min(x1 - x0, y1 - y0) / 14);
+  const cands = [];
+  for (let x = x0 + step / 2; x < x1; x += step) for (let y = y0 + step / 2; y < y1; y += step) {
+    const d = clear(x, y);
+    if (d >= minClear) cands.push({ x, y, d });
+  }
+  cands.sort((a, b) => b.d - a.d);
+  const out = [];
+  for (const c of cands) {
+    if (out.every(q => Math.hypot(q.x - c.x, q.y - c.y) >= minSep)) out.push(c);
+    if (out.length >= maxPins) break;
+  }
+  return out;
+}
+
+// Camada do pinheiro: topo reto, lados abrindo, pontas levantadas e base em curva
+function tierShape(yT, yB, a, c, lift, flatBottom) {
+  const s = new THREE.Shape();
+  const rT = Math.min(2, (yT - yB) * 0.1);
+  s.moveTo(-a + rT, yT);
+  s.lineTo(a - rT, yT);
+  s.quadraticCurveTo(a, yT, a + rT * 0.3, yT - rT);
+  s.quadraticCurveTo(a + (c - a) * 0.25, yB + (yT - yB) * 0.35, c, yB + lift);      // lado direito abrindo
+  if (flatBottom) {
+    s.quadraticCurveTo(c, yB, c - lift, yB);
+    s.lineTo(-c + lift, yB);
+    s.quadraticCurveTo(-c, yB, -c, yB + lift);
+  } else {
+    s.quadraticCurveTo(c * 0.55, yB - lift * 0.15, 0, yB);                          // base em curva até o meio
+    s.quadraticCurveTo(-c * 0.55, yB - lift * 0.15, -c, yB + lift);
+  }
+  s.quadraticCurveTo(-a - (c - a) * 0.25, yB + (yT - yB) * 0.35, -a - rT * 0.3, yT - rT);
+  s.quadraticCurveTo(-a, yT, -a + rT, yT);
+  return s;
+}
+
+function buildPlateModel(font, p, withConnectors) {
+  let names = parseNames(p);
+  if (p.sortBySize) names.sort((a, b) => Math.max(...a.map(s => s.length)) - Math.max(...b.map(s => s.length)));
+  const n = names.length;
+  const tanA = Math.tan(p.angle * Math.PI / 180);
+  const blocks = names.map((lines, i) => {
+    const ci = i % p.colors.length;
+    return { kind: 'name', label: lines.join(' '), lines, color: p.colors[ci], colorKey: 'cor' + (ci + 1) };
+  });
+  if (p.year) {
+    const ci = n % p.colors.length;
+    const auto = p.yearAuto && p.colors.length > 1;
+    const yr = p.upper ? p.year.toLocaleUpperCase('pt-BR') : p.year;
+    blocks.push({ kind: 'year', label: yr, lines: [yr], color: auto ? p.colors[ci] : p.yearColor, colorKey: auto ? 'cor' + (ci + 1) : 'ano' });
+  }
+
+  // ---- layout de cima para baixo; d = distância do vértice da árvore até o topo da camada
+  let d = p.wTop / (2 * tanA);
+  let y = 0;
+  const built = [];
+  const totalLines = blocks.filter(B => B.kind === 'name').reduce((a, B) => a + B.lines.length, 0);
+  let gi = 0;
+  blocks.forEach((B, bi) => {
+    const tierW = B.kind === 'year' ? p.yearW + 2 * p.pad : 2 * tanA * d;
+    const w = Math.max(5, tierW - 2 * p.pad);
+    const yT = y;
+    let yy = yT - p.pad;
+    const lines = [];
+    // altura cresce de cima para baixo (como na foto); a letra estica para preencher a largura
+    let maxLineW = 0;
+    B.lines.forEach((s, j) => {
+      const tb = textBox(font, p.font, s);
+      if (tb.bw <= 0 || tb.bh <= 0) return;
+      // altura cresce linha a linha: no nome composto, a linha de baixo fica maior
+      let hLine;
+      if (B.kind === 'year') hLine = p.hTop;
+      else {
+        const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
+        hLine = (p.hTop + (p.hBot - p.hTop) * tt) * (B.lines.length > 1 ? 0.8 : 1);
+        gi++;
+      }
+      // não deixa a letra ficar mais que 2x mais larga nem 2,5x mais estreita que o normal
+      // proporção calculada sem o espaçamento; o espaçamento só alarga/estreita a linha depois
+      const ratio = spacingRatio(font, p.font, s);
+      const bw0 = tb.bw / ratio;
+      const natW = hLine * bw0 / tb.bh;
+      const lw0 = Math.min(w, natW * 2);
+      const h = Math.min(hLine, lw0 * tb.bh / bw0 * 2.5);
+      const lw = lw0 * ratio;
+      maxLineW = Math.max(maxLineW, lw);
+      if (j > 0) yy -= p.lineGap;
+      yy -= h;
+      lines.push({ str: s, x0: -lw / 2, y0: yy, w: lw, h });
+    });
+    if (!lines.length) return;
+    const yB = yy - p.pad;
+    // se o espaçamento alargou a linha, a camada alarga junto para as letras não saírem da placa
+    built.push({ ...B, linesFit: lines, tierW: Math.max(tierW, maxLineW + 2 * p.pad), yT, yB, isLast: bi === blocks.length - 1 });
+    // próxima camada começa um pouco acima da base desta (as camadas se sobrepõem como galhos)
+    const next = yB + Math.min(p.pad, (yT - yB) * 0.25) + p.flare * 0.35 - p.gap;
+    d += yT - next;
+    y = next;
+  });
+  if (!built.length) return [];
+
+  // desloca para a base ficar em y = 0
+  const shift = -Math.min(...built.map(b => b.yB));
+  built.forEach(b => {
+    b.yT += shift; b.yB += shift;
+    b.linesFit.forEach(L => { L.fit = textFit(font, p.font, L.str, L.x0, L.y0 + shift, L.w, L.h); });
+  });
+
+  const P = p.P, L = p.L;
+  const pinR = p.pinD / 2, holeR = pinR + p.tol;
+  const holeDepth = Math.min(p.pinH + 0.4, L - 1.2);
+  const pinH = Math.max(0.8, holeDepth - 0.4);
+  const parts = [];
+  const plateGeoms = [];
+  const pinGeoms = [];
+
+  // placa: camadas do pinheiro
+  built.forEach(b => {
+    const a = b.tierW / 2, c = a + p.flare;
+    const lift = Math.min(p.flare * 0.9, (b.yT - b.yB) * 0.35);
+    plateGeoms.push(new THREE.ExtrudeGeometry(tierShape(b.yT, b.yB, a, c, lift, b.isLast), { depth: P, bevelEnabled: false, curveSegments: 12 }));
+  });
+
+  // relevo (letras / estrela) com furos para os pinos da placa
+  const reliefPart = (islands, meta) => {
+    const geoms = [];
+    for (const isl of islands) {
+      let spots = [];
+      if (withConnectors) {
+        spots = bestPinSpots(isl, holeR + 0.8, 2, 4 * p.pinD);
+        spots.forEach(sp => pinGeoms.push(
+          new THREE.CylinderGeometry(pinR, pinR, pinH + 0.2, 20).rotateX(Math.PI / 2).translate(sp.x, sp.y, P + (pinH + 0.2) / 2 - 0.2)));
+      }
+      if (spots.length) {
+        // furo cego: camada de trás com furo + camada da frente inteira
+        geoms.push(new THREE.ExtrudeGeometry(islandShape(isl, spots.map(sp => ({ x: sp.x, y: sp.y, r: holeR }))), { depth: holeDepth, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, P));
+        geoms.push(new THREE.ExtrudeGeometry(islandShape(isl), { depth: L - holeDepth, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, P + holeDepth));
+      } else {
+        geoms.push(new THREE.ExtrudeGeometry(islandShape(isl), { depth: L, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, P));
+      }
+    }
+    return { ...meta, geoms };
+  };
+
+  // estrela: base na cor da placa (embaixo) + estrela em relevo
+  if (p.star) {
+    const R = p.starSize / 2, top = built[0].yT;
+    const cy = top + R * 0.55;
+    plateGeoms.push(new THREE.ExtrudeGeometry(starShape(0, cy, R), { depth: P, bevelEnabled: false, curveSegments: 10 }));
+    const pts = starShape(0, cy, R).extractPoints(10);
+    parts.push(reliefPart([{ outer: pts.shape, holes: [] }], { kind: 'star', label: 'Estrela', color: p.starColor, colorKey: 'estrela' }));
+  }
+
+  built.forEach(b => {
+    const islands = b.linesFit.flatMap(Lf => worldIslands(font, p.font, Lf.str, Lf.fit));
+    parts.push(reliefPart(islands, { kind: b.kind, label: b.label, color: b.color, colorKey: b.colorKey }));
+  });
+
+  const plate = { kind: 'plate', label: 'Placa (pinheiro)', color: p.plateColor, colorKey: 'placa', geoms: [...plateGeoms, ...pinGeoms] };
+  return [plate, ...parts].map((pt, order) => ({
+    order, kind: pt.kind, label: pt.label, color: pt.color, colorKey: pt.colorKey,
+    explodeZ: pt.kind !== 'plate', flip: pt.kind !== 'plate',
+    geometry: finalize(pt.geoms),
+  }));
+}
+
+// ---------------------------------------------------------------- cena
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#1d2026');
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight('#ffffff', '#3a3f4a', 1.4));
+const sun = new THREE.DirectionalLight('#ffffff', 2.2);
+sun.position.set(120, 200, 260);
+scene.add(sun);
+const fill = new THREE.DirectionalLight('#ffffff', 0.7);
+fill.position.set(-200, 60, -150);
+scene.add(fill);
+const grid = new THREE.GridHelper(400, 40, '#3a3f4a', '#2a2e36');
+scene.add(grid);
+
+// ---- dentro do app de gestão (iframe): usa as cores e o tema claro/escuro do app
+function hostStyle() {
+  if (window.parent === window) return null;
+  try { return window.parent.getComputedStyle(window.parent.document.documentElement); } catch { return null; }
+}
+function applyHostTheme() {
+  const cs = hostStyle();
+  if (!cs) return;
+  const g = (k, fb) => cs.getPropertyValue(k).trim() || fb;
+  const vars = {
+    '--bg': g('--bg'), '--panel': g('--panel'), '--panel2': g('--field', g('--panel')),
+    '--line': g('--line'), '--text': g('--text'), '--muted': g('--muted'),
+    '--accent': g('--accent'), '--accent2': g('--accent-hover', g('--accent')), '--accent-ink': g('--accent-ink', '#000'),
+    '--btn': g('--panel'), '--btn-hover': g('--accent-soft', g('--panel')), '--on': g('--accent-soft', g('--line')),
+    '--float': g('--panel'), '--err': g('--bad', '#c42b2b'), '--sw-border': g('--line-strong', g('--line')),
+  };
+  const root = document.documentElement.style;
+  for (const [k, v] of Object.entries(vars)) if (v) root.setProperty(k, v);
+  root.colorScheme = cs.colorScheme || '';
+  const bg = g('--bg');
+  if (bg) { try { scene.background = new THREE.Color(bg); } catch { /* cor em formato que o three não lê: mantém */ } }
+}
+if (hostStyle()) {
+  document.body.classList.add('embed');
+  applyHostTheme();
+  // troca de tema no app (botão claro/escuro) ou no sistema
+  try {
+    new MutationObserver(applyHostTheme).observe(window.parent.document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+    window.parent.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyHostTheme);
+  } catch { /* sem acesso ao app: fica com o tema próprio */ }
+}
+
+const modelGroup = new THREE.Group();
+scene.add(modelGroup);
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+// Medidas que crescem/encolhem com a altura total (espessuras, barras e encaixes ficam fixos)
+const SCALED = ['wTop', 'hTop', 'hBot', 'yearW', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
+const modelHeight = (parts) => {
+  let lo = Infinity, hi = -Infinity;
+  for (const pt of parts) { lo = Math.min(lo, pt.geometry.boundingBox.min.y); hi = Math.max(hi, pt.geometry.boundingBox.max.y); }
+  return hi - lo;
+};
+const buildAny = (font, p, wc) => {
+  SPACING = p.spacing;
+  const build = p.style === 'plate' ? buildPlateModel : buildModel;
+  let parts = build(font, p, wc);
+  if (!p.treeH || !parts.length) return parts;
+  // altura total definida: reescala as medidas e refaz até a altura bater (a altura quase é proporcional)
+  let q = p;
+  for (let i = 0; i < 5; i++) {
+    const H = modelHeight(parts);
+    if (!(H > 0) || Math.abs(H - p.treeH) < 0.1) break;
+    const s = p.treeH / H;
+    q = { ...q };
+    for (const k of SCALED) q[k] *= s;
+    parts = build(font, q, wc);
+  }
+  return parts;
+};
+// "Voltar ao padrão": todos os campos voltam aos valores originais do app
+$('resetDefaults').addEventListener('click', () => {
+  document.querySelectorAll('#form input, #form select, #form textarea').forEach(el => {
+    if (el.type === 'file') el.value = '';
+    else if (el.type === 'checkbox') el.checked = el.defaultChecked;
+    else if (el.tagName === 'SELECT') { const o = [...el.options].find(o => o.defaultSelected); if (o) el.value = o.value; }
+    else el.value = el.defaultValue;
+  });
+  nameColors = DEFAULT_COLORS.slice();
+  renderColors();
+  applyStyle(true);
+  firstFit = true;
+  regenerate();
+});
+
+// barra deslizante e campo numérico do espaçamento andam juntos
+$('spacingRange').addEventListener('input', () => { $('spacing').value = $('spacingRange').value; });
+$('spacing').addEventListener('input', () => { $('spacingRange').value = $('spacing').value; });
+let viewMode = 'assembled';
+let firstFit = true;
+let lastParts = null;
+
+function showParts(parts, exploded, gap) {
+  modelGroup.children.forEach(m => m.geometry.dispose());
+  modelGroup.clear();
+  parts.forEach(pt => {
+    const mesh = new THREE.Mesh(pt.geometry, new THREE.MeshStandardMaterial({ color: pt.color, roughness: 0.55, metalness: 0.05 }));
+    if (exploded) {
+      if (pt.explodeZ) mesh.position.z = gap * 1.5;            // placa: letras levantadas de cima da placa
+      else if (pt.kind !== 'plate') mesh.position.y = (parts.length - 1 - pt.order) * gap;
+    }
+    modelGroup.add(mesh);
+  });
+  const bb = new THREE.Box3().setFromObject(modelGroup);
+  grid.position.y = bb.min.y - 0.01;
+  if (firstFit) {
+    const c = bb.getCenter(new THREE.Vector3()), s = bb.getSize(new THREE.Vector3());
+    const dist = Math.max(s.x, s.y) * 1.9 + 40;
+    controls.target.copy(c);
+    camera.position.set(c.x + dist * 0.12, c.y + dist * 0.06, c.z + dist);
+    firstFit = false;
+  }
+}
+
+function setStatus(msg, err) {
+  const el = $('status');
+  el.textContent = msg;
+  el.className = 'status' + (err ? ' err' : '');
+}
+
+function showInfo(parts) {
+  const bb = new THREE.Box3();
+  parts.forEach(p => bb.union(p.geometry.boundingBox));
+  const s = bb.getSize(new THREE.Vector3());
+  const li = parts.map(p => {
+    const b = p.geometry.boundingBox;
+    return `<li><span class="sw" style="background:${p.color}"></span>${escapeHtml(p.label)} — ${(b.max.x - b.min.x).toFixed(0)}×${(b.max.y - b.min.y).toFixed(0)} mm</li>`;
+  }).join('');
+  $('info').innerHTML = `<div class="dims">Tamanho total: ${s.x.toFixed(0)} × ${s.y.toFixed(0)} × ${s.z.toFixed(1)} mm · ${parts.length} peças</div><ul>${li}</ul>`;
+}
+
+const escapeHtml = (s) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function regenerate() {
+  const p = params();
+  try {
+    setStatus('Gerando…');
+    const font = await getFont(p.font).catch(e => { if (fontCache[p.font]) return fontCache[p.font]; throw e; });
+    const exploded = viewMode === 'parts';
+    const parts = buildAny(font, p, exploded);
+    if (!parts.length) { setStatus('Digite pelo menos um nome.', true); return; }
+    lastParts = parts;
+    showParts(parts, exploded, p.explode);
+    showInfo(parts);
+    setStatus(exploded ? 'Peças com conectores' : 'Pronto');
+  } catch (err) {
+    console.error(err);
+    setStatus('Erro: ' + err.message, true);
+  }
+}
+
+let timer = null;
+function schedule() { clearTimeout(timer); timer = setTimeout(regenerate, 250); }
+$('form').addEventListener('input', schedule);
+$('form').addEventListener('change', schedule);
+
+$('vAssembled').onclick = () => { viewMode = 'assembled'; $('vAssembled').classList.add('on'); $('vParts').classList.remove('on'); regenerate(); };
+$('vFit').onclick = () => { firstFit = true; regenerate(); };
+$('vParts').onclick =() => { viewMode = 'parts'; $('vParts').classList.add('on'); $('vAssembled').classList.remove('on'); regenerate(); };
+
+// ---------------------------------------------------------------- exportação
+function positions(geom, dx = 0, dy = 0, dz = 0) {
+  const src = geom.getAttribute('position').array;
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i += 3) { out[i] = src[i] + dx; out[i + 1] = src[i + 1] + dy; out[i + 2] = src[i + 2] + dz; }
+  return out;
+}
+
+function concat(arrs) {
+  const out = new Float32Array(arrs.reduce((a, b) => a + b.length, 0));
+  let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+
+function stl(pos) {
+  const nt = pos.length / 9;
+  const buf = new ArrayBuffer(84 + 50 * nt);
+  const dv = new DataView(buf);
+  dv.setUint32(80, nt, true);
+  let o = 84;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < nt; t++) {
+    const i = t * 9;
+    a.set(pos[i], pos[i + 1], pos[i + 2]); b.set(pos[i + 3], pos[i + 4], pos[i + 5]); c.set(pos[i + 6], pos[i + 7], pos[i + 8]);
+    const nrm = new THREE.Vector3().subVectors(c, b).cross(new THREE.Vector3().subVectors(a, b)).normalize();
+    for (const v of [nrm, a, b, c]) { dv.setFloat32(o, v.x, true); dv.setFloat32(o + 4, v.y, true); dv.setFloat32(o + 8, v.z, true); o += 12; }
+    o += 2;
+  }
+  return new Uint8Array(buf);
+}
+
+function threeMF(objs) {
+  const colors = [...new Set(objs.map(o => o.color.toUpperCase()))];
+  const out = [`<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="pt-BR" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n<resources>\n<basematerials id="1">`];
+  colors.forEach(c => out.push(`<base name="${c}" displaycolor="${c}FF"/>`));
+  out.push('</basematerials>\n');
+  objs.forEach((o, idx) => {
+    const map = new Map(), verts = [], tris = [];
+    const vid = (x, y, z) => {
+      const k = x.toFixed(4) + ',' + y.toFixed(4) + ',' + z.toFixed(4);
+      let id = map.get(k);
+      if (id === undefined) { id = verts.length; map.set(k, id); verts.push(`<vertex x="${x.toFixed(4)}" y="${y.toFixed(4)}" z="${z.toFixed(4)}"/>`); }
+      return id;
+    };
+    const pos = o.pos;
+    for (let i = 0; i < pos.length; i += 9) {
+      const a = vid(pos[i], pos[i + 1], pos[i + 2]), b = vid(pos[i + 3], pos[i + 4], pos[i + 5]), c = vid(pos[i + 6], pos[i + 7], pos[i + 8]);
+      if (a !== b && b !== c && a !== c) tris.push(`<triangle v1="${a}" v2="${b}" v3="${c}"/>`);
+    }
+    out.push(`<object id="${idx + 2}" name="${escapeHtml(o.name)}" type="model" pid="1" pindex="${colors.indexOf(o.color.toUpperCase())}"><mesh><vertices>${verts.join('')}</vertices><triangles>${tris.join('')}</triangles></mesh></object>\n`);
+  });
+  out.push('</resources>\n<build>');
+  objs.forEach((o, idx) => out.push(`<item objectid="${idx + 2}"/>`));
+  out.push('</build>\n</model>');
+  return zipSync({
+    '[Content_Types].xml': strToU8('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>'),
+    '_rels/.rels': strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'),
+    '3D/3dmodel.model': strToU8(out.join('')),
+  });
+}
+
+// Posições na orientação de impressão: peças com flip (letras em relevo) ficam de cara para a mesa
+function printPos(p) {
+  const pos = positions(p.geometry);
+  if (p.flip) for (let i = 0; i < pos.length; i += 3) { pos[i + 1] = -pos[i + 1]; pos[i + 2] = -pos[i + 2]; }
+  return pos;
+}
+function bboxOf(pos) {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], pos[i + k]); mx[k] = Math.max(mx[k], pos[i + k]); }
+  return { mn, mx, sx: mx[0] - mn[0], sy: mx[1] - mn[1] };
+}
+function moved(pos, dx, dy, dz) {
+  for (let i = 0; i < pos.length; i += 3) { pos[i] += dx; pos[i + 1] += dy; pos[i + 2] += dz; }
+  return pos;
+}
+
+// Organiza as peças deitadas na mesa (prateleiras)
+function pack(parts, bedW = 240, gap = 6) {
+  const items = parts.map(p => { const pos = printPos(p); return { p, pos, b: bboxOf(pos) }; })
+    .sort((a, b) => b.b.sy - a.b.sy);
+  let x = 0, y = 0, rowH = 0;
+  const placed = new Map();
+  for (const it of items) {
+    if (x > 0 && x + it.b.sx > bedW) { x = 0; y += rowH + gap; rowH = 0; }
+    placed.set(it.p, moved(it.pos, x - it.b.mn[0], y - it.b.mn[1], -it.b.mn[2]));
+    x += it.b.sx + gap; rowH = Math.max(rowH, it.b.sy);
+  }
+  return placed;
+}
+
+const slug = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'peca';
+
+function download(data, name, type) {
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function partsFor(withConnectors) {
+  const p = params();
+  const font = await getFont(p.font).catch(e => { if (fontCache[p.font]) return fontCache[p.font]; throw e; });
+  return buildAny(font, p, withConnectors);
+}
+
+const fileBase = () => 'arvore_' + slug(parseNames(params()).map(l => l[0]).slice(0, 3).join('_')).toLowerCase();
+
+async function run(label, fn) {
+  try { setStatus(label + '…'); await new Promise(r => setTimeout(r, 30)); await fn(); setStatus('Arquivo gerado ✔'); }
+  catch (err) { console.error(err); setStatus('Erro: ' + err.message, true); }
+}
+
+$('exAssembled3mf').onclick = () => run('Gerando 3MF', async () => {
+  const parts = await partsFor(false);
+  const objs = parts.map(p => ({ name: `${String(p.order + 1).padStart(2, '0')} ${p.label} (${p.colorKey})`, color: p.color, pos: positions(p.geometry) }));
+  download(threeMF(objs), fileBase() + '_montado.3mf', 'model/3mf');
+});
+
+$('exAssembledStl').onclick = () => run('Gerando STL', async () => {
+  const parts = await partsFor(false);
+  download(stl(concat(parts.map(p => positions(p.geometry)))), fileBase() + '_montado.stl', 'model/stl');
+});
+
+$('exParts3mf').onclick = () => run('Gerando 3MF de peças', async () => {
+  const parts = await partsFor(true);
+  const placed = pack(parts);
+  const objs = parts.map(p => ({ name: `${String(p.order + 1).padStart(2, '0')} ${p.label} (${p.colorKey})`, color: p.color, pos: placed.get(p) }));
+  download(threeMF(objs), fileBase() + '_pecas.3mf', 'model/3mf');
+});
+
+$('exPartsZip').onclick = () => run('Gerando ZIP', async () => {
+  const parts = await partsFor(true);
+  const files = {};
+  for (const p of parts) {
+    const raw = printPos(p), b = bboxOf(raw);
+    const pos = moved(raw, -(b.mn[0] + b.mx[0]) / 2, -(b.mn[1] + b.mx[1]) / 2, -b.mn[2]);
+    files[`pecas/${String(p.order + 1).padStart(2, '0')}_${slug(p.label)}_${p.colorKey}.stl`] = stl(pos);
+  }
+  const byColor = {};
+  parts.forEach(p => (byColor[p.colorKey + '_' + p.color.slice(1)] ||= []).push(p));
+  for (const [key, list] of Object.entries(byColor)) {
+    const placed = pack(list);
+    files[`por_cor/${key}.stl`] = stl(concat(list.map(p => placed.get(p))));
+  }
+  files['LEIA-ME.txt'] = strToU8(
+    'Árvore de Nomes 3D\n\n' +
+    'pecas/   -> um STL por peça (numeradas de cima para baixo).\n' +
+    'por_cor/ -> todas as peças de uma mesma cor juntas, para imprimir de uma vez.\n\n' +
+    (parts[0] && parts[0].kind === 'plate'
+      ? 'A placa imprime deitada, com os pinos para cima. As letras já vêm de cara para baixo,\n' +
+        'com os furos para cima: é só encaixar nos pinos da placa. Pedacinhos sem furo (acentos) vão com cola.\n'
+      : 'Imprima as peças deitadas (face de trás na mesa), sem suporte.\n' +
+        'Cada peça tem pinos embaixo que encaixam nas cavidades da peça de baixo.\n') +
+    'Se ficar justo demais, aumente a "Folga do encaixe"; se ficar frouxo, use uma gota de cola.\n');
+  download(zipSync(files), fileBase() + '_pecas.zip', 'application/zip');
+});
+
+regenerate();
+</script>
+</body>
+</html>
