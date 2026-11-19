@@ -86,7 +86,7 @@
     <h1>🎄 Árvore de Nomes 3D</h1>
     <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
     <div class="head-row">
-      <span class="version" title="Versão do app">versão 1.5</span>
+      <span class="version" title="Versão do app">versão 1.6</span>
       <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
     </div>
   </header>
@@ -159,7 +159,7 @@
       <p class="hint">A largura de cada nome segue a diagonal da árvore e a altura cresce de forma regular do topo para a base. As letras esticam para preencher, então nome curto ou comprido fica com a mesma altura daquela posição.</p>
       <label><b>Altura total da árvore</b> (mm, da ponta da estrela até a base; vazio = automática)</label>
       <input autocomplete="off" type="number" id="treeH" value="" placeholder="automática" min="20" step="5">
-      <p class="hint">Com altura total definida, as medidas abaixo viram proporções: o app aumenta ou diminui tudo junto até bater a altura. Espessuras, barras e encaixes não mudam.</p>
+      <p class="hint">Com altura total definida, as medidas abaixo viram proporções: o app aumenta ou diminui tudo junto até bater a altura. Se a largura ou a altura do <b>nome de baixo</b> estiver preenchida, ela é que manda: a árvore toda se ajusta a essa medida e a altura total é ignorada. Espessuras, barras e encaixes não mudam.</p>
       <div class="row">
         <div><label>Largura do nome do topo</label><input autocomplete="off" type="number" id="wTop" value="40" min="5"></div>
         <div><label>Ângulo da árvore (°)</label><input autocomplete="off" type="number" id="angle" value="25" min="10" max="45"></div>
@@ -869,26 +869,16 @@ function buildModel(font, p, withConnectors) {
     const k = B.lines.length;
     // cada linha: largura pela diagonal na altura em que ela começa, altura pela posição na árvore
     const Ls = [];
-    let off = p.t, offAuto = p.t; // offAuto: onde a linha começaria com o tamanho automático
-    let h0Auto = 0; // altura automática da 1ª linha do bloco
+    let off = p.t;
     B.lines.forEach((s, j) => {
       const lineD = j === 0 ? d : d + off;
-      let lp = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.plateW, 2 * tanA * lineD) : 2 * tanA * lineD;
-      const isSized = bi === n - 1 && B.kind === 'name'; // o nome de baixo (logo acima do ano)
-      // primeiro nome com largura própria: a 1ª linha fica com essa largura e a 2ª (nome composto) mantém a proporção
-      // nome de baixo com largura própria: a 1ª linha fica com essa largura e a 2ª (nome composto) mantém a proporção
-      if (isSized && p.lastW) lp = p.lastW * (j === 0 ? d : d + offAuto) / d;
+      const lp = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.plateW, 2 * tanA * lineD) : 2 * tanA * lineD;
       const lw = Math.max(5, lp - 2 * p.mh - 2 * side);
-      let h, hAuto;
-      if (B.kind === 'year') h = hAuto = p.yearH;
+      let h;
+      if (B.kind === 'year') h = p.yearH;
       else {
         const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
         h = (p.hTop + (p.hBot - p.hTop) * tt) * (k > 1 ? 0.8 : 1);
-        // primeiro nome com altura própria: a 1ª linha fica com essa altura, a 2ª cresce na mesma proporção
-        hAuto = h;
-        if (j === 0) h0Auto = h;
-        // nome de baixo com altura própria: a 1ª linha fica com essa altura, a 2ª cresce na mesma proporção
-        if (isSized && p.lastH) h *= p.lastH / h0Auto;
         gi++;
       }
       // espaçamento só muda o vão entre as letras: a largura de cada letra fica igual à do espaçamento 0
@@ -899,10 +889,10 @@ function buildModel(font, p, withConnectors) {
       L.plateW = ratio === 1 ? lp : L.w + 2 * p.mh + 2 * side;
       Ls.push(L);
       off += L.accH + L.letterH + (j < k - 1 ? L.cedH + p.t : 0);
-      const sAuto = hAuto / L.letterH;
-      offAuto += (L.accH + L.letterH) * sAuto + (j < k - 1 ? L.cedH * sAuto + p.t : 0);
     });
     if (!Ls.length) return;
+    // tamanho do nome de baixo (1ª linha), usado para ajustar a árvore toda a ele
+    if (bi === n - 1 && B.kind === 'name') LAST_INFO = { w: Ls[0].w, h: Ls[0].letterH };
     const last = Ls[Ls.length - 1];
     const plateW = last.plateW, w = last.w; // largura do bloco = a da linha mais larga (a de baixo)
     const upper = built[built.length - 1];
@@ -1118,15 +1108,13 @@ function buildPlateModel(font, p, withConnectors) {
   const totalLines = blocks.filter(B => B.kind === 'name').reduce((a, B) => a + B.lines.length, 0);
   let gi = 0;
   blocks.forEach((B, bi) => {
-    const isSized = bi === n - 1 && B.kind === 'name'; // o nome de baixo (logo acima do ano)
-    const tierW = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.tierW, 2 * tanA * d, 2 * p.pad)
-      : (isSized && p.lastW) ? p.lastW + 2 * p.pad : 2 * tanA * d;
+    const tierW = B.kind === 'year' ? yearWidth(p, built[built.length - 1]?.tierW, 2 * tanA * d, 2 * p.pad) : 2 * tanA * d;
     const w = Math.max(5, tierW - 2 * p.pad);
     const yT = y;
     let yy = yT - p.pad;
     const lines = [];
     // altura cresce de cima para baixo (como na foto); a letra estica para preencher a largura
-    let maxLineW = 0, h0Auto = 0;
+    let maxLineW = 0;
     B.lines.forEach((s, j) => {
       const tb = textBox(font, p.font, s);
       if (tb.bw <= 0 || tb.bh <= 0) return;
@@ -1136,8 +1124,6 @@ function buildPlateModel(font, p, withConnectors) {
       else {
         const tt = totalLines > 1 ? Math.min(1, gi / (totalLines - 1)) : 1;
         hLine = (p.hTop + (p.hBot - p.hTop) * tt) * (B.lines.length > 1 ? 0.8 : 1);
-        if (j === 0) h0Auto = hLine;
-        if (isSized && p.lastH) hLine *= p.lastH / h0Auto;
         gi++;
       }
       // não deixa a letra ficar mais que 2x mais larga nem 2,5x mais estreita que o normal
@@ -1145,7 +1131,7 @@ function buildPlateModel(font, p, withConnectors) {
       const ratio = spacingRatio(font, p.font, s);
       const bw0 = tb.bw / ratio;
       const natW = hLine * bw0 / tb.bh;
-      const lw0 = (isSized && p.lastW) ? w : Math.min(w, natW * 2);
+      const lw0 = Math.min(w, natW * 2);
       const h = Math.min(hLine, lw0 * tb.bh / bw0 * 2.5);
       const lw = lw0 * ratio;
       maxLineW = Math.max(maxLineW, lw);
@@ -1154,6 +1140,8 @@ function buildPlateModel(font, p, withConnectors) {
       lines.push({ str: s, x0: -lw / 2, y0: yy, w: lw, h });
     });
     if (!lines.length) return;
+    // tamanho do nome de baixo (1ª linha), usado para ajustar a árvore toda a ele
+    if (bi === n - 1 && B.kind === 'name') LAST_INFO = { w: lines[0].w, h: lines[0].h };
     const yB = yy - p.pad;
     // se o espaçamento alargou a linha, a camada alarga junto para as letras não saírem da placa
     built.push({ ...B, linesFit: lines, tierW: Math.max(tierW, maxLineW + 2 * p.pad), yT, yB, isLast: bi === blocks.length - 1 });
@@ -1295,16 +1283,43 @@ resize();
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
 
 // Medidas que crescem/encolhem com a altura total (espessuras, barras e encaixes ficam fixos)
-const SCALED = ['wTop', 'hTop', 'hBot', 'lastW', 'lastH', 'yearW', 'yearH', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
+const SCALED = ['wTop', 'hTop', 'hBot', 'yearW', 'yearH', 'starSize', 'mh', 'pad', 'flare', 'gap', 'lineGap'];
 const modelHeight = (parts) => {
   let lo = Infinity, hi = -Infinity;
   for (const pt of parts) { lo = Math.min(lo, pt.geometry.boundingBox.min.y); hi = Math.max(hi, pt.geometry.boundingBox.max.y); }
   return hi - lo;
 };
+// Tamanho que o nome de baixo ficou na última montagem (os dois estilos preenchem)
+let LAST_INFO = null;
 const buildAny = (font, p, wc) => {
   SPACING = p.spacing;
   const build = p.style === 'plate' ? buildPlateModel : buildModel;
+  LAST_INFO = null;
   let parts = build(font, p, wc);
+  if ((p.lastW || p.lastH) && parts.length) {
+    // Medida do nome de baixo definida: a árvore TODA aumenta/diminui junto até o nome de baixo bater.
+    // Só largura ou só altura: escala tudo por igual. As duas: escala pela altura e abre/fecha o
+    // ângulo da árvore até a largura bater (as larguras saem da diagonal, então o formato se mantém).
+    let q = p;
+    for (let i = 0; i < 10 && LAST_INFO; i++) {
+      const sw = p.lastW ? p.lastW / LAST_INFO.w : 1;
+      const sh = p.lastH ? p.lastH / LAST_INFO.h : 1;
+      if (Math.abs(sw - 1) < 0.002 && Math.abs(sh - 1) < 0.002) break;
+      q = { ...q };
+      if (p.lastW && p.lastH) {
+        for (const k of SCALED) q[k] *= sh;              // tamanho geral pela altura
+        const f = sw / sh;                                // o que falta na largura
+        const t = Math.tan(q.angle * Math.PI / 180) * f;  // diagonal mais aberta/fechada...
+        q.angle = Math.min(80, Math.max(3, Math.atan(t) * 180 / Math.PI));
+        q.wTop *= f; q.yearW *= f;                        // ...sem mudar a altura da árvore
+      } else {
+        const s = p.lastW ? sw : sh;
+        for (const k of SCALED) q[k] *= s;
+      }
+      parts = build(font, q, wc);
+    }
+    return parts; // com o nome de baixo definido, a altura total é consequência dele
+  }
   if (!p.treeH || !parts.length) return parts;
   // altura total definida: reescala as medidas e refaz até a altura bater (a altura quase é proporcional)
   let q = p;
