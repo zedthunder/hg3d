@@ -89,7 +89,7 @@
     <h1>🎄 Árvore de Nomes 3D</h1>
     <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
     <div class="head-row">
-      <span class="version" title="Versão do app">versão 1.8</span>
+      <span class="version" title="Versão do app">versão 1.9</span>
       <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
     </div>
   </header>
@@ -103,7 +103,7 @@
       <summary>Nomes</summary>
       <label><b>Nomes</b> — um por linha ou separados por <code>*</code></label>
       <textarea autocomplete="off" id="names">Ana*David*Maria Julia*Mamãe*Papai</textarea>
-      <label>Últimos nomes usados <span class="hint">(guardados quando você exporta um arquivo)</span></label>
+      <label>Últimos nomes usados <span class="hint">(guardados com as medidas quando você exporta um arquivo)</span></label>
       <div class="recent-row">
         <select autocomplete="off" id="recentNames" aria-label="Últimos nomes usados"></select>
         <button type="button" id="clearRecent" title="Apagar a lista de últimos nomes">Limpar</button>
@@ -198,7 +198,7 @@
         <div class="only-cutout"><label>Largura do pino (losango)</label><input autocomplete="off" type="number" id="pw" value="5" step="0.5" min="2"></div>
         <div class="only-cutout"><label>Quanto o pino entra embaixo</label><input autocomplete="off" type="number" id="pl" value="4" step="0.5" min="1"></div>
         <div><label>Folga do encaixe</label><input autocomplete="off" type="number" id="tol" value="0.2" step="0.05" min="0"></div>
-        <div class="only-cutout"><label>2 pinos a partir de (mm de largura)</label><input autocomplete="off" type="number" id="twoPegMin" value="55" min="10"></div>
+        <div class="only-cutout"><label>2 pinos a partir de (mm de largura)</label><input autocomplete="off" type="number" id="twoPegMin" value="20" min="10"></div>
         <div class="only-plate"><label>Diâmetro do pino (placa)</label><input autocomplete="off" type="number" id="pinD" value="3" step="0.5" min="1.5"></div>
         <div class="only-plate"><label>Altura do pino (placa)</label><input autocomplete="off" type="number" id="pinH" value="2.5" step="0.5" min="1"></div>
         <div><label>Afastamento na visualização</label><input autocomplete="off" type="number" id="explode" value="14" min="0"></div>
@@ -286,11 +286,32 @@ const RECENT_KEY = 'arvore3d.ultimosNomes';
 function loadRecent() {
   try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
 }
+// Todas as medidas e opções do formulário (menos os nomes, que vão à parte) + as cores dos nomes
+function snapshotForm() {
+  const fields = {};
+  document.querySelectorAll('#form input, #form select, #form textarea').forEach(el => {
+    if (!el.id || el.type === 'file' || ['names', 'year', 'recentNames', 'spacingRange'].includes(el.id)) return;
+    fields[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  return { fields, colors: nameColors.slice() };
+}
+function applyForm(form) {
+  for (const [id, v] of Object.entries(form.fields || {})) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!v;
+    else if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === v)) continue; // ex.: fonte própria que não está carregada
+    else el.value = v;
+  }
+  if (Array.isArray(form.colors) && form.colors.length) { nameColors = form.colors.slice(); renderColors(); }
+  $('spacingRange').value = $('spacing').value;
+  applyStyle(false);
+}
 function saveRecent() {
   const names = $('names').value.trim(), year = $('year').value.trim();
   if (!names) return;
   const list = loadRecent().filter(r => !(r.names === names && r.year === year));
-  list.unshift({ names, year, when: Date.now() });
+  list.unshift({ names, year, when: Date.now(), form: snapshotForm() });
   try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 15))); } catch { /* sem armazenamento: só não guarda */ }
   renderRecent();
 }
@@ -299,8 +320,12 @@ function renderRecent() {
   sel.innerHTML = '';
   sel.add(new Option(list.length ? 'Escolher uma lista usada antes…' : 'Nenhuma lista guardada ainda', ''));
   list.forEach((r, i) => {
-    const label = r.names.replace(/\s*[\n*]+\s*/g, ' · ') + (r.year ? ` (${r.year})` : '');
-    sel.add(new Option(label.length > 70 ? label.slice(0, 67) + '…' : label, String(i)));
+    const f = (r.form && r.form.fields) || {};
+    // mostra junto as medidas principais que foram usadas
+    const size = [f.treeH && `${f.treeH} mm alt.`, f.lastW && `base ${f.lastW} mm`].filter(Boolean).join(', ');
+    const label = r.names.replace(/\s*[\n*]+\s*/g, ' · ') + (r.year ? ` (${r.year})` : '')
+      + (f.style ? (f.style === 'plate' ? ' · placa' : ' · vazado') : '') + (size ? ` · ${size}` : '');
+    sel.add(new Option(label.length > 90 ? label.slice(0, 87) + '…' : label, String(i)));
   });
   sel.disabled = !list.length;
   $('clearRecent').hidden = !list.length;
@@ -309,6 +334,7 @@ $('recentNames').addEventListener('change', (e) => {
   const r = e.target.value === '' ? null : loadRecent()[+e.target.value];
   e.target.value = '';
   if (!r) return;
+  if (r.form) applyForm(r.form); // volta também as medidas e opções daquela vez
   $('names').value = r.names;
   $('year').value = r.year;
   firstFit = true;
@@ -838,7 +864,8 @@ function jointSpots(font, p, up, lo, s) {
   const lo0 = Math.max(up.anchorRange[0], lo.barTop[0]) + a + 1, hi0 = Math.min(up.anchorRange[1], lo.barTop[1]) - a - 1;
   if (hi0 < lo0) return [(lo0 + hi0) / 2];
   const c = (lo0 + hi0) / 2, ov = hi0 - lo0 + 2 * (a + 1);
-  const targets = ov >= p.twoPegMin ? [c - ov / 4, c + ov / 4] : [c];
+  // 2 pinos sempre que a largura deixa (assim a peça não gira); 1 só em emenda bem estreita
+  const targets = ov >= p.twoPegMin && hi0 - lo0 >= 2 * a + 3 ? [c - ov / 4, c + ov / 4] : [c];
   const cands = [];
   for (let x = lo0; x <= hi0; x += 0.25) cands.push({ x, sc: score(x) });
   const chosen = [];
