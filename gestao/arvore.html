@@ -61,6 +61,9 @@
   .status { position: absolute; right: 12px; bottom: 12px; color: var(--muted); font-size: 12px; background: var(--float); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
   .status.err { color: var(--err); }
   body.style-plate .only-cutout, body.style-cutout .only-plate { display: none; }
+  .recent-row { display: flex; gap: 6px; }
+  .recent-row select { flex: 1; min-width: 0; }
+  .recent-row button { padding: 6px 10px; font-size: 12px; }
   /* dentro do app de gestão: a aba já tem título, então o cabeçalho fica só com versão e "Voltar ao padrão" */
   body.embed header h1, body.embed header > p { display: none; }
   body.embed header { padding: 10px 16px; }
@@ -86,7 +89,7 @@
     <h1>🎄 Árvore de Nomes 3D</h1>
     <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
     <div class="head-row">
-      <span class="version" title="Versão do app">versão 1.6</span>
+      <span class="version" title="Versão do app">versão 1.7</span>
       <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
     </div>
   </header>
@@ -100,6 +103,11 @@
       <summary>Nomes</summary>
       <label><b>Nomes</b> — um por linha ou separados por <code>*</code></label>
       <textarea autocomplete="off" id="names">Ana*David*Maria Julia*Mamãe*Papai</textarea>
+      <label>Últimos nomes usados <span class="hint">(guardados quando você exporta um arquivo)</span></label>
+      <div class="recent-row">
+        <select autocomplete="off" id="recentNames" aria-label="Últimos nomes usados"></select>
+        <button type="button" id="clearRecent" title="Apagar a lista de últimos nomes">Limpar</button>
+      </div>
       <label class="chk"><input autocomplete="off" type="checkbox" id="splitComposite" checked>
         <span>Nomes compostos em duas linhas<small>“Maria Julia” vira duas linhas na mesma peça e mesma cor. Use <code>/</code> para escolher onde quebrar (ex.: <code>Ana/Clara</code>) mesmo com a opção desligada.</small></span></label>
       <label class="chk"><input autocomplete="off" type="checkbox" id="upper" checked><span>Tudo em maiúsculas</span></label>
@@ -159,7 +167,7 @@
       <p class="hint">A largura de cada nome segue a diagonal da árvore e a altura cresce de forma regular do topo para a base. As letras esticam para preencher, então nome curto ou comprido fica com a mesma altura daquela posição.</p>
       <label><b>Altura total da árvore</b> (mm, da ponta da estrela até a base; vazio = automática)</label>
       <input autocomplete="off" type="number" id="treeH" value="" placeholder="automática" min="20" step="5">
-      <p class="hint">Com altura total definida, as medidas abaixo viram proporções: o app aumenta ou diminui tudo junto até bater a altura. Se a largura ou a altura do <b>nome de baixo</b> estiver preenchida, ela é que manda: a árvore toda se ajusta a essa medida e a altura total é ignorada. Espessuras, barras e encaixes não mudam.</p>
+      <p class="hint">Com altura total definida, as medidas abaixo viram proporções: o app aumenta ou diminui tudo junto até bater a altura. A largura e a altura do <b>nome de baixo</b> também podem ser definidas: sem altura total, a árvore toda se ajusta a elas; com altura total, ela fica fixa e o resto da árvore se acomoda para o nome de baixo ter a medida pedida. Espessuras, barras e encaixes não mudam.</p>
       <div class="row">
         <div><label>Largura do nome do topo</label><input autocomplete="off" type="number" id="wTop" value="40" min="5"></div>
         <div><label>Ângulo da árvore (°)</label><input autocomplete="off" type="number" id="angle" value="25" min="10" max="45"></div>
@@ -271,6 +279,46 @@ function applyStyle(changeFont) {
 }
 $('style').addEventListener('change', () => { applyStyle(true); firstFit = true; });
 applyStyle(true);
+
+// ---------------------------------------------------------------- últimos nomes usados
+// Guardados neste navegador quando um arquivo é exportado (até 15 listas, a mais recente primeiro).
+const RECENT_KEY = 'arvore3d.ultimosNomes';
+function loadRecent() {
+  try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveRecent() {
+  const names = $('names').value.trim(), year = $('year').value.trim();
+  if (!names) return;
+  const list = loadRecent().filter(r => !(r.names === names && r.year === year));
+  list.unshift({ names, year, when: Date.now() });
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 15))); } catch { /* sem armazenamento: só não guarda */ }
+  renderRecent();
+}
+function renderRecent() {
+  const sel = $('recentNames'), list = loadRecent();
+  sel.innerHTML = '';
+  sel.add(new Option(list.length ? 'Escolher uma lista usada antes…' : 'Nenhuma lista guardada ainda', ''));
+  list.forEach((r, i) => {
+    const label = r.names.replace(/\s*[\n*]+\s*/g, ' · ') + (r.year ? ` (${r.year})` : '');
+    sel.add(new Option(label.length > 70 ? label.slice(0, 67) + '…' : label, String(i)));
+  });
+  sel.disabled = !list.length;
+  $('clearRecent').hidden = !list.length;
+}
+$('recentNames').addEventListener('change', (e) => {
+  const r = e.target.value === '' ? null : loadRecent()[+e.target.value];
+  e.target.value = '';
+  if (!r) return;
+  $('names').value = r.names;
+  $('year').value = r.year;
+  firstFit = true;
+  schedule();
+});
+$('clearRecent').addEventListener('click', () => {
+  try { localStorage.removeItem(RECENT_KEY); } catch { /* nada a apagar */ }
+  renderRecent();
+});
+renderRecent();
 
 // ---------------------------------------------------------------- cores
 const DEFAULT_COLORS = ['#1e6b3a', '#b3202a'];
@@ -1291,46 +1339,68 @@ const modelHeight = (parts) => {
 };
 // Tamanho que o nome de baixo ficou na última montagem (os dois estilos preenchem)
 let LAST_INFO = null;
+// Aviso quando não dá para bater todas as medidas pedidas ao mesmo tempo
+let FIT_NOTE = '';
+const NOT_HBOT = SCALED.filter(k => k !== 'hBot');
+
+// Abre/fecha a diagonal da árvore: todas as larguras multiplicam por f e a altura não muda
+function widenTree(q, f) {
+  const t = Math.tan(q.angle * Math.PI / 180) * f;
+  q.angle = Math.min(80, Math.max(3, Math.atan(t) * 180 / Math.PI));
+  q.wTop *= f; q.yearW *= f;
+}
+
 const buildAny = (font, p, wc) => {
   SPACING = p.spacing;
+  FIT_NOTE = '';
   const build = p.style === 'plate' ? buildPlateModel : buildModel;
   LAST_INFO = null;
   let parts = build(font, p, wc);
-  if ((p.lastW || p.lastH) && parts.length) {
-    // Medida do nome de baixo definida: a árvore TODA aumenta/diminui junto até o nome de baixo bater.
-    // Só largura ou só altura: escala tudo por igual. As duas: escala pela altura e abre/fecha o
-    // ângulo da árvore até a largura bater (as larguras saem da diagonal, então o formato se mantém).
-    let q = p;
-    for (let i = 0; i < 10 && LAST_INFO; i++) {
-      const sw = p.lastW ? p.lastW / LAST_INFO.w : 1;
-      const sh = p.lastH ? p.lastH / LAST_INFO.h : 1;
-      if (Math.abs(sw - 1) < 0.002 && Math.abs(sh - 1) < 0.002) break;
-      q = { ...q };
-      if (p.lastW && p.lastH) {
-        for (const k of SCALED) q[k] *= sh;              // tamanho geral pela altura
-        const f = sw / sh;                                // o que falta na largura
-        const t = Math.tan(q.angle * Math.PI / 180) * f;  // diagonal mais aberta/fechada...
-        q.angle = Math.min(80, Math.max(3, Math.atan(t) * 180 / Math.PI));
-        q.wTop *= f; q.yearW *= f;                        // ...sem mudar a altura da árvore
-      } else {
-        const s = p.lastW ? sw : sh;
-        for (const k of SCALED) q[k] *= s;
-      }
-      parts = build(font, q, wc);
-    }
-    return parts; // com o nome de baixo definido, a altura total é consequência dele
-  }
-  if (!p.treeH || !parts.length) return parts;
-  // altura total definida: reescala as medidas e refaz até a altura bater (a altura quase é proporcional)
+  if (!(p.treeH || p.lastW || p.lastH) || !parts.length) return parts;
+  // com altura total fixa, o nome de baixo pode ocupar no máximo 35% dela (senão o resto some)
+  let capped = false;
+  if (p.treeH && p.lastH > p.treeH * 0.35) { p = { ...p, lastH: p.treeH * 0.35 }; capped = true; }
+  // Ajusta as medidas e refaz até bater o que foi pedido:
+  // - altura total definida: ela FICA FIXA. A altura do nome de baixo (se pedida) vem da altura da letra
+  //   na base e o resto encolhe/cresce junto para caber; a largura do nome de baixo abre/fecha a diagonal.
+  // - sem altura total: o nome de baixo manda no tamanho da árvore toda (escala por igual; com as duas
+  //   medidas, escala pela altura e abre/fecha a diagonal para a largura).
   let q = p;
-  for (let i = 0; i < 5; i++) {
-    const H = modelHeight(parts);
-    if (!(H > 0) || Math.abs(H - p.treeH) < 0.1) break;
-    const s = p.treeH / H;
+  const errs = () => {
+    const H = modelHeight(parts), L = LAST_INFO;
+    return {
+      st: p.treeH && H > 0 ? p.treeH / H : 1,
+      sw: p.lastW && L ? p.lastW / L.w : 1,
+      sh: p.lastH && L ? p.lastH / L.h : 1,
+    };
+  };
+  const close = ({ st, sw, sh }) => [st, sw, sh].every(v => Math.abs(v - 1) < 0.002);
+  for (let i = 0; i < 16; i++) {
+    const { st, sw, sh } = errs();
+    if (close({ st, sw, sh })) break;
     q = { ...q };
-    for (const k of SCALED) q[k] *= s;
+    if (p.treeH) {
+      if (p.lastH) { q.hBot *= sh; for (const k of NOT_HBOT) q[k] *= st; }
+      else for (const k of SCALED) q[k] *= st;
+      if (p.lastW) widenTree(q, sw);
+    } else if (p.lastW && p.lastH) {
+      for (const k of SCALED) q[k] *= sh;
+      widenTree(q, sw / sh);
+    } else {
+      const s = p.lastW ? sw : sh;
+      for (const k of SCALED) q[k] *= s;
+    }
     parts = build(font, q, wc);
   }
+  const e = errs();
+  // proteção: se o ajuste desandou (árvore sumindo), volta para o tamanho sem ajuste
+  if (!(modelHeight(parts) > 5) || !LAST_INFO || LAST_INFO.w < 3 || LAST_INFO.h < 2) {
+    FIT_NOTE = 'Essas medidas não cabem juntas; mostrando o tamanho automático';
+    LAST_INFO = null;
+    return build(font, { ...p, treeH: 0, lastW: 0, lastH: 0 }, wc);
+  }
+  if (capped) FIT_NOTE = 'Nome de baixo limitado a 35% da altura total da árvore';
+  else if ([e.st, e.sw, e.sh].some(v => Math.abs(v - 1) > 0.02)) FIT_NOTE = 'Medidas pedidas não cabem juntas; ficou o mais próximo possível';
   return parts;
 };
 // "Voltar ao padrão": todos os campos voltam aos valores originais do app
@@ -1407,7 +1477,7 @@ async function regenerate() {
     lastParts = parts;
     showParts(parts, exploded, p.explode);
     showInfo(parts);
-    setStatus(exploded ? 'Peças com conectores' : 'Pronto');
+    setStatus(FIT_NOTE || (exploded ? 'Peças com conectores' : 'Pronto'), !!FIT_NOTE);
   } catch (err) {
     console.error(err);
     setStatus('Erro: ' + err.message, true);
@@ -1533,7 +1603,7 @@ async function partsFor(withConnectors) {
 const fileBase = () => 'arvore_' + slug(parseNames(params()).map(l => l[0]).slice(0, 3).join('_')).toLowerCase();
 
 async function run(label, fn) {
-  try { setStatus(label + '…'); await new Promise(r => setTimeout(r, 30)); await fn(); setStatus('Arquivo gerado ✔'); }
+  try { setStatus(label + '…'); await new Promise(r => setTimeout(r, 30)); await fn(); saveRecent(); setStatus('Arquivo gerado ✔'); }
   catch (err) { console.error(err); setStatus('Erro: ' + err.message, true); }
 }
 
