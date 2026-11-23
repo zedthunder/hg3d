@@ -89,7 +89,7 @@
     <h1>🎄 Árvore de Nomes 3D</h1>
     <p>Gerador paramétrico para impressão 3D — nomes compostos e peças separadas com encaixe.</p>
     <div class="head-row">
-      <span class="version" title="Versão do app">versão 1.9</span>
+      <span class="version" title="Versão do app">versão 1.10</span>
       <button id="resetDefaults" type="button" title="Volta todos os campos para os valores padrão">Voltar ao padrão</button>
     </div>
   </header>
@@ -813,7 +813,9 @@ function layeredSolid(polys, notches, jointY, p) {
   for (const poly of polys) {
     const [bx0, bx1, by0, by1] = bbox(poly);
     // essa forma é atravessada por algum encaixe?
-    const hit = notches.filter(n => { const h = pocketHalf(n.s, p); return bx1 > n.x - h && bx0 < n.x + h && by1 > jointY - depthOf(n) && by0 < jointY; });
+    // n.up: o furo sobe a partir da junta (furo na estrela); senão desce (furo na peça de baixo)
+    const span = (n) => n.up ? [jointY - 1, jointY + depthOf(n)] : [jointY - depthOf(n), jointY + 1];
+    const hit = notches.filter(n => { const h = pocketHalf(n.s, p), [ya, yb] = span(n); return bx1 > n.x - h && bx0 < n.x + h && by1 > ya && by0 < yb; });
     if (!hit.length) { out.push(...extrudeMP([poly], 0, p.D)); continue; }
     out.push(new THREE.ExtrudeGeometry(mpShapes([poly]), { depth: zc - A + OV, bevelEnabled: false, curveSegments: 1 }));
     for (let i = 0; i < N; i++) {
@@ -822,7 +824,7 @@ function layeredSolid(polys, notches, jointY, p) {
       const rects = [];
       for (const n of hit) {
         const hw = pocketHalf(n.s, p) - minDz;
-        if (hw > 0.05) rects.push(rectPoly(n.x - hw, n.x + hw, jointY - depthOf(n), jointY + 1));
+        if (hw > 0.05) { const [ya, yb] = span(n); rects.push(rectPoly(n.x - hw, n.x + hw, ya, yb)); }
       }
       out.push(...extrudeMP(rects.length ? PC().difference(poly, ...rects) : [poly], z0, z1, OV));
     }
@@ -832,6 +834,29 @@ function layeredSolid(polys, notches, jointY, p) {
 }
 
 // Pino em losango ao longo de Y, centrado na espessura
+// Onde cabe o furo do pino dentro da perninha da estrela: a perninha é inclinada e afina, então
+// procura a posição (perto da ponta), a grossura e o comprimento que cabem inteiros, com parede em volta.
+function starPegFit(st, p) {
+  const pts = starShape(0, st.cy, st.R).extractPoints(12).shape;
+  const top = st.yBot;
+  const fits = (x, s, L) => {
+    const a = pocketHalf(s, p) + 0.6, y1 = top + L + p.tol + 0.8;
+    for (let y = top + 1; y <= y1 + 1e-6; y += 0.4)
+      for (const X of [x - a, x - a / 2, x, x + a / 2, x + a]) if (!inPoly(X, y, pts)) return false;
+    return true;
+  };
+  for (let L = p.pl; L >= 1.5; L -= 0.25) {
+    for (let s = Math.min(p.pw / 2, 2.2); s >= 0.9; s -= 0.1) {
+      let best = null;
+      for (let x = st.legX - 6; x <= st.legX + 1; x += 0.1) {
+        if (fits(x, s, L) && (best === null || Math.abs(x - st.legX) < Math.abs(best - st.legX))) best = x;
+      }
+      if (best !== null) return { x: best, s, len: L };
+    }
+  }
+  return { x: st.legX, s: 0.9, len: 1.5 };
+}
+
 function diamondPeg(x, s, y0, y1, p) {
   const d = s * Math.SQRT2;
   return new THREE.BoxGeometry(d, y1 - y0, d).rotateY(Math.PI / 4).translate(x, (y0 + y1) / 2, p.D / 2);
@@ -1030,17 +1055,22 @@ function buildModel(font, p, withConnectors) {
     built[0].barTop = union(built[0].barTop, [-xr - 2 * pegS, xr + 2 * pegS]);
   }
   chain.push(...built);
-  chain.forEach(c => { c.pegs = []; c.notches = []; });
+  chain.forEach(c => { c.pegs = []; c.pegsUp = []; c.notches = []; });
 
   if (withConnectors) {
     for (let i = 0; i < chain.length - 1; i++) {
       const up = chain[i], lo = chain[i + 1];
       let xs, s = p.pw / 2;
-      let len = p.pl;
-      // estrela: a barra de cima do primeiro nome é fina, então o encaixe fica dentro dela
-      // (quase da espessura da barra, com 0,4 mm de fundo) e o pino da estrela é curto
-      if (up.kind === 'star') { xs = [-up.legX, up.legX]; s = up.pegS; len = Math.max(0.6, Math.min(p.pl, lo.tTop - 0.4 - p.tol)); }
-      else {
+      const len = p.pl;
+      if (up.kind === 'star') {
+        // estrela: o pino comprido sai da barra (fina) do primeiro nome PARA CIMA e o furo fica na perninha da estrela
+        const f = starPegFit(up, p);
+        for (const x of [-f.x, f.x]) {
+          lo.pegsUp.push({ x, s: f.s, len: f.len });
+          up.notches.push({ x, s: f.s, len: f.len, up: true });
+        }
+        continue;
+      } else {
         xs = jointSpots(font, p, up, lo, s);
         // quanto o pino entra na peça de cima: na barra de baixo dela, ou na letra
         up.embed = up.bottom ? tBotB - 0.3 : Math.min(3, up.Ls[up.Ls.length - 1].letterH * 0.4);
@@ -1082,7 +1112,9 @@ function buildModel(font, p, withConnectors) {
         if (p.sideBars) { polys.push(rectPoly(x0, x0 + p.t, c.yAnchor, c.top)); polys.push(rectPoly(x1 - p.t, x1, c.yAnchor, c.top)); }
         c.Ls.forEach(L => polys.push(...linePolys(font, p, L, e)));
       }
-      geoms = layeredSolid(polys.filter(Boolean), c.notches, c.top, p);
+      geoms = layeredSolid(polys.filter(Boolean), c.notches, c.kind === 'star' ? c.yBot : c.top, p);
+      // pino para cima (só no primeiro nome): nasce dentro da barra e sobe até o furo da estrela
+      for (const { x, s, len } of c.pegsUp) geoms.push(diamondPeg(x, s, c.top - (c.tTop - 0.3), c.top + len, p));
       // pino: sai do fundo da peça (entrando c.embed nela), atravessa a faixa da cedilha e entra no encaixe de baixo
       for (const { x, s, len } of c.pegs) geoms.push(diamondPeg(x, s, c.yBot - len, c.yAnchor + (c.embed || 2), p));
     }
