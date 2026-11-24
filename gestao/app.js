@@ -143,6 +143,9 @@
 
   /* ---------- abas ---------- */
   function setTab(tab) {
+    // Saiu da calculadora no meio de uma atualização sem mudar nada: encerra a edição,
+    // para que o próximo pedido não seja gravado por cima do registro aberto.
+    if (state.tab === 'calc' && tab !== 'calc' && state.order.id && !state.order.dirty) closeEditing();
     state.tab = tab;
     $$('.view').forEach((v) => { v.hidden = v.id !== `view-${tab}`; });
     $$('.tab').forEach((b) => {
@@ -630,6 +633,23 @@
     renderHistory();
     if (short.length) toast(`Estoque insuficiente em ${short.join(', ')}. Pedido aprovado mesmo assim.`, 'error');
     else toast(approved ? `Pedido ${refLabel(rec.ref)} aprovado.` : `${refLabel(rec.ref)} voltou para orçamento.`);
+  }
+
+  /* Deixa a calculadora com um pedido novo e vazio (sem salvar nada). */
+  function closeEditing() {
+    state.order = newOrder();
+    if (state.editingItemId) resetForm(true);
+    else { save(); renderOrder(); }
+  }
+
+  /* Botão "Novo orçamento" do dashboard: nunca continua um registro aberto para atualizar. */
+  function startNewOrder() {
+    const o = state.order;
+    if (o.id) {
+      if (o.dirty && !confirm(`Você estava atualizando o ${kindLabel(o)} ${refLabel(o.ref)} e não salvou as mudanças. Descartar as mudanças e começar um orçamento novo?`)) return;
+      closeEditing();
+    }
+    setTab('calc');
   }
 
   function newOrderFlow() {
@@ -1557,6 +1577,7 @@
       renderGoals();
     },
     'order-new': newOrderFlow,
+    'order-start': startNewOrder,
     'order-whatsapp': () => {
       ensureRef();
       renderOrder();
