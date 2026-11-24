@@ -49,6 +49,7 @@
     order: newOrder(),
     history: [],
     stock: [],
+    products: [],
     currency: 'BRL',
     seq: 1,
     editingItemId: null,
@@ -106,6 +107,7 @@
     state.order = { ...newOrder(), ...(data.order || {}) };
     state.history = Array.isArray(data.history) ? data.history : [];
     state.stock = Array.isArray(data.stock) ? data.stock : [];
+    state.products = Array.isArray(data.products) ? data.products : [];
     // Só cria a primeira meta se nunca houve metas; apagar todas continua valendo.
     state.goals = Array.isArray(data.goals) ? data.goals : [firstGoal()];
     state.currency = ['BRL', 'USD', 'EUR'].includes(data.currency) ? data.currency : 'BRL';
@@ -151,6 +153,7 @@
     if (tab === 'dashboard') renderDashboard();
     if (tab === 'history') renderHistory();
     if (tab === 'stock') renderStock();
+    if (tab === 'products') renderProducts();
     if (tab === 'settings') fillSettings();
     if (tab === 'gallery') openGallery();
     if (tab === 'arvore') openArvore();
@@ -176,6 +179,7 @@
     syncMargin();
     renderColors();
     syncFormChrome();
+    renderProductSelect();
   }
 
   function renderColors() {
@@ -453,6 +457,7 @@
           <div class="order-item-meta">${esc(itemMeta(item))}${item.result.qty > 1 ? ` · ${fmtMoney(item.result.unitPrice)} cada` : ''}</div>
           <div class="order-item-actions">
             <button class="icon-btn" data-action="item-edit" data-id="${esc(item.id)}" title="Editar" aria-label="Editar ${esc(item.input.name)}">${icon('edit')}</button>
+            <button class="btn btn-sm item-product-btn" data-action="item-product" data-id="${esc(item.id)}" title="Salvar esta impressão como produto">${icon('tag')}Criar produto</button>
             <button class="icon-btn" data-action="item-dup" data-id="${esc(item.id)}" title="Duplicar" aria-label="Duplicar ${esc(item.input.name)}">${icon('copy')}</button>
             <button class="icon-btn danger" data-action="item-del" data-id="${esc(item.id)}" title="Remover" aria-label="Remover ${esc(item.input.name)}">${icon('trash')}</button>
           </div>
@@ -1195,7 +1200,273 @@
     renderOrder();
     renderHistory();
     renderStock();
+    renderProducts();
     renderDashboard();
+  }
+
+  /* ---------- produtos ----------
+     Um produto guarda a receita de UMA peça: filamento, tempo, custos extras e valor por peça.
+     Ao escolher na calculadora, tudo é multiplicado pela quantidade.
+     Nos produtos feitos por mesas, peso e tempo continuam por mesa (como na calculadora). */
+  const SCALED = ['grams', 'grams2', 'time', 'laborTime', 'others', 'pack', 'fixedPrice'];
+  const PLATE_FIXED = ['grams', 'grams2', 'time']; // por mesas, estes não escalam com a quantidade
+  const isTimeKey = (k) => k === 'time' || k === 'laborTime';
+  const numText = (n) => (n > 0 ? String(Math.round(n * 100) / 100).replace('.', ',') : '');
+  const timeText = (h) => (h > 0 ? formatTime(h) : '');
+  const qtyOf = (d) => Math.max(1, Math.floor(parseNumber(d.qty)) || 1);
+  const findProduct = (id) => state.products.find((p) => p.id === id);
+
+  /* Transforma o que está na calculadora (para N peças) em valores por peça. */
+  function productFromDraft(d, base = {}) {
+    const qty = qtyOf(d);
+    const input = clone(d);
+    delete input.productId;
+    delete input.productScale;
+    input.qty = 1;
+    const unit = {};
+    SCALED.forEach((k) => {
+      if (d.mode === 'plates' && PLATE_FIXED.includes(k)) return;
+      const v = isTimeKey(k) ? parseTime(d[k]) : parseNumber(d[k]);
+      if (v > 0) unit[k] = v / qty;
+    });
+    const now = new Date().toISOString();
+    return {
+      id: base.id || uid(),
+      name: String(base.name ?? d.name ?? '').trim(),
+      size: base.size || '',
+      description: base.description || '',
+      input, unit,
+      createdAt: base.createdAt || now,
+      updatedAt: now,
+    };
+  }
+
+  /* Coloca na calculadora os valores do produto multiplicados pela quantidade. */
+  function scaleDraft(d, p) {
+    const q = qtyOf(d);
+    SCALED.forEach((k) => {
+      if (d.mode === 'plates' && PLATE_FIXED.includes(k)) return;
+      const v = (p.unit || {})[k] || 0;
+      d[k] = isTimeKey(k) ? timeText(v * q) : numText(v * q);
+    });
+  }
+
+  function draftFromProduct(p, qty = 1) {
+    const d = newDraft({ ...clone(p.input), name: p.name, qty, productId: p.id, productScale: true });
+    scaleDraft(d, p);
+    return d;
+  }
+
+  const productUnitResult = (p) => calculateItem(draftFromProduct(p, 1), state.settings);
+
+  function productSummary(p) {
+    const i = p.input;
+    if (i.mode === 'plates') {
+      const colors = (i.colors || []).map((c) => c.name).filter(Boolean).join(' + ');
+      return `Por mesas${i.capacity ? ` · ${i.capacity} por mesa` : ''}${colors ? ` · ${colors}` : ''}`;
+    }
+    const u = p.unit || {};
+    return [i.material || 'Filamento 3D', u.grams ? fmtGrams(u.grams) : '', u.time ? formatTime(u.time) : ''].filter(Boolean).join(' · ');
+  }
+
+  /* Menu "Produto" no topo da calculadora. */
+  function renderProductSelect() {
+    const sel = $('#product-select');
+    const d = state.draft;
+    const current = d.productId && findProduct(d.productId);
+    const list = [...state.products].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    sel.innerHTML = `<option value="">${list.length ? 'Item avulso (sem produto)' : 'Nenhum produto cadastrado'}</option>`
+      + list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}${p.size ? ` · ${esc(p.size)}` : ''}</option>`).join('');
+    sel.value = current ? current.id : '';
+    sel.disabled = !list.length;
+    const hint = $('#product-hint');
+    if (current) {
+      hint.innerHTML = `${d.productScale ? 'Peso, tempo e valor acompanham a quantidade.' : 'Você mudou valores do produto só para este item.'}
+        <button type="button" class="btn-link" data-action="product-update-from-draft">Salvar estes valores no produto</button>`;
+    } else {
+      hint.textContent = list.length ? '' : 'Adicione um item ao pedido e use o botão “Criar produto” para salvá-lo aqui.';
+    }
+    hint.hidden = !hint.innerHTML;
+  }
+
+  function pickProduct(id) {
+    const p = id && findProduct(id);
+    if (!p) {
+      delete state.draft.productId;
+      delete state.draft.productScale;
+    } else {
+      state.draft = draftFromProduct(p, qtyOf(state.draft));
+    }
+    save();
+    fillForm();
+    renderResult();
+    renderProductSelect();
+  }
+
+  /* A quantidade mudou: refaz peso, tempo e valor a partir do produto. */
+  function onDraftFieldInput(key) {
+    const d = state.draft;
+    if (!d.productId) return;
+    if (key === 'qty' && d.productScale) {
+      const p = findProduct(d.productId);
+      if (!p) return;
+      scaleDraft(d, p);
+      SCALED.forEach((k) => { const el = $(`[data-f="${k}"]`); if (el && document.activeElement !== el) el.value = d[k] ?? ''; });
+    } else if (SCALED.includes(key) && d.productScale) {
+      d.productScale = false; // valor mexido à mão: deixa de acompanhar a quantidade
+      renderProductSelect();
+    }
+  }
+
+  function updateProductFromDraft() {
+    const d = state.draft;
+    const p = d.productId && findProduct(d.productId);
+    if (!p) return;
+    if (!confirm(`Salvar os valores da calculadora no produto "${p.name}"?\n\nOs valores são guardados por peça (dividindo pela quantidade ${qtyOf(d)}).`)) return;
+    Object.assign(p, productFromDraft(d, p));
+    d.productScale = true;
+    save();
+    renderProducts();
+    renderProductSelect();
+    toast(`Produto "${p.name}" atualizado.`);
+  }
+
+  /* Aba Produtos */
+  function renderProducts() {
+    const el = $('#products-body');
+    if (!state.products.length) {
+      el.innerHTML = `<div class="panel empty"><span class="empty-ic">${icon('tag')}</span><strong>Nenhum produto ainda</strong>
+        <span>Na calculadora, adicione uma impressão ao pedido e clique em “Criar produto” no item. Ou use “Novo produto”.</span></div>`;
+      return;
+    }
+    const list = [...state.products].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    el.innerHTML = `<div class="products">${list.map((p) => {
+      const r = productUnitResult(p);
+      const fixed = (p.unit || {}).fixedPrice > 0;
+      return `<div class="panel product">
+        <div class="product-head">
+          <span class="product-ic">${icon('tag')}</span>
+          <div class="product-name"><b>${esc(p.name)}</b>${p.size ? `<span>${esc(p.size)}</span>` : ''}</div>
+          <button class="icon-btn" data-action="product-edit" data-id="${esc(p.id)}" title="Editar" aria-label="Editar ${esc(p.name)}">${icon('edit')}</button>
+          <button class="icon-btn danger" data-action="product-del" data-id="${esc(p.id)}" title="Excluir" aria-label="Excluir ${esc(p.name)}">${icon('trash')}</button>
+        </div>
+        ${p.description ? `<p class="product-desc">${esc(p.description)}</p>` : ''}
+        <div class="product-meta">${esc(productSummary(p))}</div>
+        <div class="product-foot">
+          <div class="product-price"><b>${r.valid ? fmtMoney(r.price) : '—'}</b><span>${fixed ? 'valor fixo' : 'calculado'} por peça${r.valid ? ` · custo ${fmtMoney(r.cost)}` : ''}</span></div>
+          <button class="btn btn-sm btn-approve" data-action="product-use" data-id="${esc(p.id)}">${icon('calc')}Usar</button>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  /* O diálogo edita uma cópia; só grava ao clicar em Salvar. */
+  let productEditing = null;
+  let productIsNew = false;
+
+  function openProductForm(p, isNew) {
+    productEditing = clone(p);
+    productIsNew = isNew;
+    const f = $('#product-form');
+    const i = productEditing.input;
+    const u = productEditing.unit || {};
+    const plates = i.mode === 'plates';
+    $('#product-title').textContent = isNew ? 'Novo produto' : 'Editar produto';
+    f.elements.name.value = productEditing.name;
+    f.size.value = productEditing.size || '';
+    f.description.value = productEditing.description || '';
+    f.material.value = i.material || '';
+    f.costKg.value = i.costKg || '';
+    f.costKg.placeholder = String(state.settings.defaultCostKg).replace('.', ',');
+    f.grams.value = numText(u.grams || 0);
+    f.time.value = timeText(u.time || 0);
+    f.price.value = numText(u.fixedPrice || 0);
+    $('#product-simple').hidden = plates;
+    const note = $('#product-plates');
+    note.hidden = !plates;
+    note.textContent = plates
+      ? `Produto feito por mesas (${productSummary(productEditing)}). Para mudar pesos e tempos, use o produto na calculadora e clique em “Salvar estes valores no produto”.`
+      : '';
+    updateProductCalc();
+    $('#product-dialog').showModal();
+    setTimeout(() => f.elements.name.focus(), 0);
+  }
+
+  /* Lê o formulário para a cópia em edição. */
+  function readProductForm() {
+    const f = $('#product-form');
+    const p = productEditing;
+    p.name = f.elements.name.value.trim();
+    p.size = f.size.value.trim();
+    p.description = f.description.value.trim();
+    p.unit = { ...(p.unit || {}) };
+    if (p.input.mode !== 'plates') {
+      p.input.material = f.material.value.trim();
+      p.input.costKg = f.costKg.value.trim();
+      p.input.spoolId = null; // valor digitado à mão vale mais que o carretel antigo
+      p.unit.grams = parseNumber(f.grams.value);
+      p.unit.time = parseTime(f.time.value);
+    }
+    p.unit.fixedPrice = parseNumber(f.price.value);
+    Object.keys(p.unit).forEach((k) => { if (!(p.unit[k] > 0)) delete p.unit[k]; });
+    return p;
+  }
+
+  function updateProductCalc() {
+    const p = readProductForm();
+    const r = productUnitResult(p);
+    $('#product-calc').textContent = r.valid
+      ? `Custo por peça: ${fmtMoney(r.cost)} · valor pelo lucro: ${fmtMoney(calculateItem({ ...draftFromProduct(p, 1), fixedPrice: '' }, state.settings).price)}`
+      : 'Informe filamento e tempo para ver o custo.';
+  }
+
+  function submitProduct(ev) {
+    ev.preventDefault();
+    const p = readProductForm();
+    if (!p.name) return toast('Dê um nome ao produto.', 'error');
+    p.updatedAt = new Date().toISOString();
+    const idx = state.products.findIndex((x) => x.id === p.id);
+    if (idx > -1) state.products[idx] = p; else state.products.push(p);
+    save();
+    $('#product-dialog').close();
+    renderProducts();
+    renderProductSelect();
+    toast(productIsNew ? `Produto "${p.name}" criado.` : `Produto "${p.name}" salvo.`);
+  }
+
+  function newProduct() {
+    openProductForm(productFromDraft(newDraft({ margin: state.draft.margin, risk: state.draft.risk }), { name: '' }), true);
+  }
+
+  function productFromItem(id) {
+    const item = state.order.items.find((i) => i.id === id);
+    if (!item) return;
+    const p = productFromDraft({ ...item.input, qty: item.result.qty }, { name: item.input.name });
+    openProductForm(p, true);
+  }
+
+  function useProduct(id) {
+    const p = findProduct(id);
+    if (!p) return;
+    state.editingItemId = null;
+    state.draft = draftFromProduct(p, 1);
+    save();
+    setTab('calc');
+    fillForm();
+    renderResult();
+    renderOrder();
+    renderProductSelect();
+    toast(`"${p.name}" na calculadora. Ajuste a quantidade e adicione ao pedido.`);
+  }
+
+  function deleteProduct(id) {
+    const p = findProduct(id);
+    if (!p || !confirm(`Excluir o produto "${p.name}"? Pedidos e orçamentos já salvos não mudam.`)) return;
+    state.products = state.products.filter((x) => x.id !== id);
+    if (state.draft.productId === id) { delete state.draft.productId; delete state.draft.productScale; }
+    save();
+    renderProducts();
+    renderProductSelect();
   }
 
   /* ---------- ações (cliques) ---------- */
@@ -1256,6 +1527,12 @@
     'item-edit': (b) => editItem(b.dataset.id),
     'item-dup': (b) => duplicateItem(b.dataset.id),
     'item-del': (b) => deleteItem(b.dataset.id),
+    'item-product': (b) => productFromItem(b.dataset.id),
+    'product-new': newProduct,
+    'product-edit': (b) => openProductForm(findProduct(b.dataset.id), false),
+    'product-del': (b) => deleteProduct(b.dataset.id),
+    'product-use': (b) => useProduct(b.dataset.id),
+    'product-update-from-draft': updateProductFromDraft,
     'order-quote': generateNewQuote,
     'order-pdf': () => { ensureRef(); renderOrder(); openQuote(clone(state.order)); },
     'record-pdf': (b) => openQuote(state.history.find((h) => h.id === b.dataset.id)),
@@ -1364,6 +1641,7 @@
     if (el.dataset.f) {
       const key = el.dataset.f;
       state.draft[key] = el.type === 'checkbox' ? el.checked : el.value;
+      onDraftFieldInput(key);
       save();
       if (['multi', 'risk', 'fixedPrice', 'qty', 'capacity'].includes(key)) syncFormChrome();
       renderResult();
@@ -1410,6 +1688,7 @@
     const el = ev.target;
     if (el.id === 'margin-field') syncMargin();
     if (el.id === 'theme-select') setTheme(el.value);
+    if (el.id === 'product-select') pickProduct(el.value);
     if (el.id === 'order-client' || el.id === 'order-notes') renderOrder();
     if (el.id === 'currency') {
       state.currency = el.value;
@@ -1418,6 +1697,7 @@
       renderResult();
       renderOrder();
       renderStock();
+      renderProducts();
       renderDashboard();
       renderHistory();
     }
@@ -1442,6 +1722,8 @@
   });
 
   $('#spool-form').addEventListener('submit', submitSpool);
+  $('#product-form').addEventListener('submit', submitProduct);
+  $('#product-form').addEventListener('input', updateProductCalc);
   $('#goal-form').addEventListener('submit', submitGoal);
 
   /* Clique fora do conteúdo fecha o diálogo. */
@@ -1499,7 +1781,7 @@
   }
   const metaPayload = () => canonical({
     settings: state.settings, profile: state.profile, stock: state.stock,
-    goals: state.goals, currency: state.currency, seq: state.seq,
+    goals: state.goals, currency: state.currency, seq: state.seq, products: state.products,
   });
 
   function syncError(err) {
@@ -1562,6 +1844,7 @@
         state.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
         state.profile = { ...DEFAULT_PROFILE, ...(data.profile || {}) };
         state.stock = Array.isArray(data.stock) ? data.stock : [];
+        state.products = Array.isArray(data.products) ? data.products : [];
         state.goals = Array.isArray(data.goals) ? data.goals : [];
         state.currency = ['BRL', 'USD', 'EUR'].includes(data.currency) ? data.currency : 'BRL';
         state.seq = Math.max(Number(data.seq) || 1, cloud.ready ? state.seq : 1);

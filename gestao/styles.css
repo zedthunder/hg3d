@@ -605,8 +605,8 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
   main { padding: 16px; }
   .topbar { padding: 8px 16px; gap: 8px 10px; flex-wrap: wrap; position: static; }
   .tabs { order: 3; flex-basis: 100%; }
-  .tabs { display: grid; grid-template-columns: repeat(6, auto); justify-content: space-between; gap: 0; }
-  .tab { padding: 6px 4px; font-size: 11.5px; letter-spacing: -.02em; }
+  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
+  .tab { padding: 6px 4px; font-size: 12px; justify-content: center; text-align: center; }
   .kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi b { font-size: 21px; }
   .tab .ic { display: none; }
@@ -716,3 +716,24 @@ a.btn { text-decoration: none; }
 .stage-btn.stage-done.active { color: var(--good); border-color: var(--good); background: var(--good-soft); }
 .badge.stage-production { color: var(--warn); background: var(--warn-soft); }
 .kpi-expected b { color: var(--warn); }
+
+/* ---------- produtos ---------- */
+.product-pick { margin-bottom: 4px; }
+.product-pick .field { margin-bottom: 6px; }
+.product-pick .hint { margin: 0 0 14px; }
+.product-pick .btn-link { margin-left: 4px; }
+.products { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.product { display: flex; flex-direction: column; gap: 8px; }
+.product-head { display: flex; align-items: center; gap: 10px; }
+.product-ic { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--accent-soft); color: var(--accent-text); }
+.product-name { flex: 1; min-width: 0; }
+.product-name b { display: block; overflow-wrap: anywhere; }
+.product-name span { color: var(--muted); font-size: 12.5px; }
+.product-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; white-space: pre-line; }
+.product-meta { font-size: 12.5px; color: var(--faint); }
+.product-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
+.product-price b { display: block; font: 700 20px/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+.product-price span { color: var(--muted); font-size: 12px; }
+.order-item-actions .item-product-btn { padding: 3px 8px; font-size: 12px; margin-right: 4px; }
+.order-item-actions .item-product-btn .ic { width: 14px; height: 14px; }
+.hint-box { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--panel-2); margin: 0 0 14px; }
