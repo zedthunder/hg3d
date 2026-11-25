@@ -634,7 +634,7 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
   #quote-dialog::backdrop { display: none; }
   body::before, body::after, .ambient { display: none !important; }
   #quote-dialog, .quote-paper, .paper { box-shadow: none !important; filter: none !important; }
-  .quote-toolbar, .quote-warning { display: none !important; }
+  .quote-toolbar, .quote-warning, .toasts { display: none !important; } /* avisos não saem no PDF */
   .paper { margin: 0; padding: 14mm 15mm; border-radius: 0; box-shadow: none !important; border: 0 !important; }
   .paper * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

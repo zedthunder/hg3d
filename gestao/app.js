@@ -510,9 +510,16 @@
     renderOrder();
   }
 
+  /* Número novo é sempre maior que todos os já usados, mesmo que o contador tenha vindo
+     atrasado de outro aparelho. Assim um número de registro excluído nunca volta. */
+  const maxRef = () => state.history.reduce((m, h) => Math.max(m, Number(h.ref) || 0), 0);
   function ensureRef() {
     const o = state.order;
-    if (!o.ref) { o.ref = state.seq; state.seq += 1; save(); }
+    if (o.ref) return;
+    const next = Math.max(state.seq, maxRef() + 1);
+    o.ref = next;
+    state.seq = next + 1;
+    save();
   }
 
   /* Devolve o que o pedido salvo tinha tirado do estoque e desconta a versão nova. */
@@ -2030,7 +2037,8 @@
         state.products = Array.isArray(data.products) ? data.products : [];
         state.goals = Array.isArray(data.goals) ? data.goals : [];
         state.currency = ['BRL', 'USD', 'EUR'].includes(data.currency) ? data.currency : 'BRL';
-        state.seq = Math.max(Number(data.seq) || 1, cloud.ready ? state.seq : 1);
+        // O contador nunca anda para trás: vale o maior entre a nuvem e este aparelho.
+        state.seq = Math.max(Number(data.seq) || 1, state.seq);
         if (cloud.ready) refreshFromRemote();
       }
     }
