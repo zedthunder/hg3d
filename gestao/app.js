@@ -1078,7 +1078,10 @@
     }
     $('#dash-orders-total').textContent = fmtMoney(sales.price);
     const ui = lists.orders;
-    const found = sales.orders.filter((o) => matchesQuery(o, ui.query));
+    // Em produção primeiro, depois os que aguardam e por último os concluídos (mais recentes no topo de cada grupo).
+    const rank = (o) => (o.stage === 'production' ? 0 : o.stage === 'done' ? 2 : 1);
+    const found = sales.orders.filter((o) => matchesQuery(o, ui.query))
+      .sort((a, b) => rank(a) - rank(b) || new Date(b.approvedAt) - new Date(a.approvedAt));
     const { items, pages, start } = pageOf(found, ui);
     $('#dash-orders-list').innerHTML = found.length
       ? items.map(orderRowHtml).join('') + pagerHtml('orders', found.length, ui, pages, start, found.length === 1 ? 'pedido' : 'pedidos')
