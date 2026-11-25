@@ -68,6 +68,7 @@
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></symbol>
     <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
     <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
     <symbol id="i-tree" viewBox="0 0 24 24"><path d="M12 3 7 9h3l-4 5h3l-4 5h14l-4-5h3l-4-5h3zM12 19v2"/></symbol>
   </defs>
@@ -88,6 +89,7 @@
     <button class="tab" data-action="tab" data-tab="arvore"><svg class="ic"><use href="#i-tree"/></svg>Árvore 3D</button>
     <button class="tab" data-action="tab" data-tab="settings"><svg class="ic"><use href="#i-gear"/></svg>Ajustes</button>
   </nav>
+  <div id="goal-rings" class="goal-rings" hidden></div>
   <span id="sync-status" class="sync-status" role="status" hidden></span>
   <button class="theme-toggle" data-action="theme-toggle" title="Trocar tema claro/escuro" aria-label="Trocar tema claro/escuro">
     <svg class="ic when-light" aria-hidden="true"><use href="#i-moon"/></svg>
@@ -405,6 +407,13 @@
       <button type="submit" class="btn btn-primary">Salvar produto</button>
     </div>
   </form>
+</dialog>
+
+<!-- Todos os orçamentos em aberto -->
+<dialog id="quotes-dialog" class="modal modal-wide" aria-labelledby="quotes-dialog-title">
+  <div class="panel-head"><h2 id="quotes-dialog-title">Orçamentos em aberto <span id="quotes-dialog-count" class="badge"></span></h2><button type="button" class="icon-btn" data-action="close-dialog" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div id="quotes-dialog-search"></div>
+  <div id="quotes-dialog-list"></div>
 </dialog>
 
 <!-- Cadastro de meta -->

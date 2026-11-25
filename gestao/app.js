@@ -944,24 +944,7 @@
       <div class="panel kpi kpi-expected"><span>Lucro previsto</span><b>${fmtMoney(expected)}</b><small>${plural(pending.length, 'pedido', 'pedidos')} a concluir</small></div>
       <div class="panel kpi"><span>Orçamentos abertos</span><b>${open.length}</b><small>${fmtMoney(openTotal)} em aberto</small></div>`;
 
-    $('#dash-orders').innerHTML = `
-      <div class="panel-head"><h2>Pedidos aprovados em ${esc(shortMonth)}</h2></div>
-      ${sales.count ? sales.orders.map((o) => {
-        const t = orderTotals(o.items);
-        return `<div class="dash-row">
-          <div class="dash-row-main">
-            <div class="hist-title">${esc(refLabel(o.ref))} · ${esc(o.client || 'Sem cliente')}</div>
-            <div class="hist-meta">${fmtDate(o.approvedAt)} · ${esc(o.items.map((i) => `${i.result.qty}× ${i.input.name}`).join(', '))}</div>
-          </div>
-          <div class="dash-row-right">
-            <div class="hist-val"><b>${fmtMoney(t.price)}</b><span class="${t.profit < 0 ? 'bad' : ''}">${t.profit < 0 ? 'prejuízo' : 'lucro'} ${fmtMoney(t.profit)}</span></div>
-            <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do pedido ${esc(refLabel(o.ref))}">${icon('file')}</button>
-            <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
-          </div>
-          ${stageButtons(o)}
-        </div>`;
-      }).join('') + `<div class="dash-foot"><span>Total vendido</span><span>${fmtMoney(sales.price)}</span></div>`
-    : `<div class="empty empty-sm"><span class="empty-ic">${icon('check')}</span><strong>Nenhum pedido neste mês</strong><span>Aprove um orçamento para o valor entrar aqui.</span></div>`}`;
+    renderDashOrders(sales, shortMonth);
 
     renderGoals();
     renderOpenQuotes(open);
@@ -987,36 +970,190 @@
           <div class="goal-status">${p.reached ? `${icon('check')}Meta atingida` : `${percent}% · faltam ${fmtMoney(p.remaining)}`}</div>
         </div>`;
       }).join('') : `<div class="empty empty-sm"><span class="empty-ic">${icon('target')}</span><strong>Nenhuma meta</strong><span>Crie uma meta de lucro ou de vendas.</span></div>`}`;
+    renderGoalRings();
   }
 
-  /* Orçamentos ainda não aprovados, do mais recente para o mais antigo. */
-  function renderOpenQuotes(open) {
-    const list = [...open].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+  /* ---------- listas com páginas e pesquisa (dashboard) ----------
+     orders: pedidos aprovados do mês no dashboard; quotes: janela com todos os orçamentos. */
+  const PER_PAGE_OPTIONS = [5, 10, 20, 50];
+  const LIST_UI_KEY = 'hg-gestao-listas';
+  const lists = {
+    orders: { page: 1, per: 10, query: '' },
+    quotes: { page: 1, per: 10, query: '' },
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(LIST_UI_KEY) || '{}');
+    Object.keys(lists).forEach((k) => { if (PER_PAGE_OPTIONS.includes(saved[k])) lists[k].per = saved[k]; });
+  } catch (err) { /* usa o padrão */ }
+  const saveListUi = () => {
+    try { localStorage.setItem(LIST_UI_KEY, JSON.stringify({ orders: lists.orders.per, quotes: lists.quotes.per })); } catch (err) { /* opcional */ }
+  };
+
+  const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  /* Procura no número, cliente, itens e observações. "#15" acha só o pedido #0015. */
+  function matchesQuery(o, query) {
+    const words = fold(query).split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const text = fold([refLabel(o.ref), String(o.ref || ''), o.client, o.notes, ...o.items.map((i) => i.input.name)].join(' '));
+    return words.every((w) => (/^#\d+$/.test(w) ? Number(w.slice(1)) === Number(o.ref) : text.includes(w)));
+  }
+
+  /* Corta a lista na página atual (e corrige a página se a lista encolheu). */
+  function pageOf(list, ui) {
+    const pages = Math.max(1, Math.ceil(list.length / ui.per));
+    ui.page = Math.min(Math.max(1, ui.page), pages);
+    const start = (ui.page - 1) * ui.per;
+    return { items: list.slice(start, start + ui.per), pages, start };
+  }
+
+  function pagerHtml(name, total, ui, pages, start, noun) {
+    if (!total) return '';
+    const end = Math.min(total, start + ui.per);
+    return `<div class="pager">
+      <span class="pager-info">${start + 1}–${end} de ${total} ${noun}</span>
+      <label class="pager-per"><span>Por página</span>
+        <select data-per-list="${name}" aria-label="Quantos ${noun} por página">${PER_PAGE_OPTIONS.map((n) => `<option value="${n}" ${n === ui.per ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      </label>
+      <div class="pager-nav">
+        <button class="icon-btn" data-action="page" data-list="${name}" data-dir="-1" ${ui.page <= 1 ? 'disabled' : ''} aria-label="Página anterior" title="Página anterior">${icon('prev')}</button>
+        <span class="pager-page">Página ${ui.page} de ${pages}</span>
+        <button class="icon-btn" data-action="page" data-list="${name}" data-dir="1" ${ui.page >= pages ? 'disabled' : ''} aria-label="Próxima página" title="Próxima página">${icon('next')}</button>
+      </div>
+    </div>`;
+  }
+
+  const searchHtml = (name, placeholder) => `<label class="search">${icon('search')}
+      <input type="search" data-search-list="${name}" value="${esc(lists[name].query)}" placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}">
+    </label>`;
+
+  function orderRowHtml(o) {
+    const t = orderTotals(o.items);
+    return `<div class="dash-row">
+      <div class="dash-row-main">
+        <div class="hist-title">${esc(refLabel(o.ref))} · ${esc(o.client || 'Sem cliente')}</div>
+        <div class="hist-meta">${fmtDate(o.approvedAt)} · ${esc(o.items.map((i) => `${i.result.qty}× ${i.input.name}`).join(', '))}</div>
+      </div>
+      <div class="dash-row-right">
+        <div class="hist-val"><b>${fmtMoney(t.price)}</b><span class="${t.profit < 0 ? 'bad' : ''}">${t.profit < 0 ? 'prejuízo' : 'lucro'} ${fmtMoney(t.profit)}</span></div>
+        <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do pedido ${esc(refLabel(o.ref))}">${icon('file')}</button>
+        <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
+      </div>
+      ${stageButtons(o)}
+    </div>`;
+  }
+
+  function quoteRowHtml(o) {
+    const t = orderTotals(o.items);
+    return `<div class="quote-row">
+      <div class="quote-row-top">
+        <div class="hist-title">${esc(refLabel(o.ref))} · ${esc(o.client || 'Sem cliente')}</div>
+        <b class="quote-row-val">${fmtMoney(t.price)}</b>
+      </div>
+      <div class="hist-meta">${fmtDate(o.savedAt)} · ${esc(o.items.map((i) => `${i.result.qty}× ${i.input.name}`).join(', '))}</div>
+      <div class="quote-row-actions">
+        <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
+        <button class="btn btn-sm btn-approve" data-action="record-approve" data-id="${esc(o.id)}">${icon('check')}Aprovar</button>
+        <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do orçamento ${esc(refLabel(o.ref))}">${icon('file')}</button>
+        <button class="icon-btn danger" data-action="history-del" data-id="${esc(o.id)}" title="Excluir orçamento" aria-label="Excluir orçamento ${esc(refLabel(o.ref))}">${icon('trash')}</button>
+      </div>
+    </div>`;
+  }
+
+  const emptySearch = (query) => `<div class="empty empty-sm"><span class="empty-ic">${icon('search')}</span><strong>Nada encontrado</strong><span>Nenhum resultado para “${esc(query)}”.</span></div>`;
+
+  /* Pedidos aprovados do mês: cabeçalho fixo; a lista e as páginas se redesenham ao pesquisar. */
+  function renderDashOrders(sales, shortMonth) {
+    const el = $('#dash-orders');
+    if (!sales.count) {
+      el.innerHTML = `<div class="panel-head"><h2>Pedidos aprovados em ${esc(shortMonth)}</h2></div>
+        <div class="empty empty-sm"><span class="empty-ic">${icon('check')}</span><strong>Nenhum pedido neste mês</strong><span>Aprove um orçamento para o valor entrar aqui.</span></div>`;
+      return;
+    }
+    const title = `Pedidos aprovados em ${esc(shortMonth)}`;
+    if (!$('#dash-orders-list') || el.dataset.title !== title) {
+      el.dataset.title = title;
+      el.innerHTML = `<div class="panel-head wrap"><h2>${title}</h2>${searchHtml('orders', 'Pesquisar cliente, número ou item')}</div>
+        <div id="dash-orders-list"></div>
+        <div class="dash-foot"><span>Total vendido</span><span id="dash-orders-total"></span></div>`;
+    }
+    $('#dash-orders-total').textContent = fmtMoney(sales.price);
+    const ui = lists.orders;
+    const found = sales.orders.filter((o) => matchesQuery(o, ui.query));
+    const { items, pages, start } = pageOf(found, ui);
+    $('#dash-orders-list').innerHTML = found.length
+      ? items.map(orderRowHtml).join('') + pagerHtml('orders', found.length, ui, pages, start, found.length === 1 ? 'pedido' : 'pedidos')
+      : emptySearch(ui.query);
+  }
+
+  /* Painel lateral: os 5 orçamentos mais recentes e o atalho para a janela com todos. */
+  const openQuotesSorted = () => state.history.filter((o) => !isApproved(o))
+    .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+
+  function renderOpenQuotes() {
+    const list = openQuotesSorted();
     const el = $('#dash-last');
     if (!list.length) {
       el.innerHTML = `<div class="panel-head"><h2>Orçamentos em aberto</h2></div>
         <div class="empty empty-sm"><span class="empty-ic">${icon('file')}</span><strong>Nenhum orçamento em aberto</strong><span>Use “Gerar orçamento” na calculadora e ele aparece aqui.</span></div>`;
-      return;
+    } else {
+      el.innerHTML = `<div class="panel-head"><h2>Orçamentos em aberto</h2><span class="badge">${list.length}</span></div>
+        ${list.slice(0, 5).map(quoteRowHtml).join('')}
+        <div class="quotes-more"><button class="btn btn-sm" data-action="quotes-all">${icon('search')}${list.length > 5 ? `Ver mais (${list.length})` : 'Pesquisar orçamentos'}</button></div>`;
     }
-    const shown = list.slice(0, 8);
-    el.innerHTML = `<div class="panel-head"><h2>Orçamentos em aberto</h2><span class="badge">${list.length}</span></div>
-      ${shown.map((o) => {
-        const t = orderTotals(o.items);
-        return `<div class="quote-row">
-          <div class="quote-row-top">
-            <div class="hist-title">${esc(refLabel(o.ref))} · ${esc(o.client || 'Sem cliente')}</div>
-            <b class="quote-row-val">${fmtMoney(t.price)}</b>
-          </div>
-          <div class="hist-meta">${fmtDate(o.savedAt)} · ${esc(o.items.map((i) => `${i.result.qty}× ${i.input.name}`).join(', '))}</div>
-          <div class="quote-row-actions">
-            <button class="btn btn-sm" data-action="history-open" data-id="${esc(o.id)}">${icon('edit')}Atualizar</button>
-            <button class="btn btn-sm btn-approve" data-action="record-approve" data-id="${esc(o.id)}">${icon('check')}Aprovar</button>
-            <button class="icon-btn" data-action="record-pdf" data-id="${esc(o.id)}" title="Ver PDF" aria-label="Ver PDF do orçamento ${esc(refLabel(o.ref))}">${icon('file')}</button>
-            <button class="icon-btn danger" data-action="history-del" data-id="${esc(o.id)}" title="Excluir orçamento" aria-label="Excluir orçamento ${esc(refLabel(o.ref))}">${icon('trash')}</button>
-          </div>
-        </div>`;
-      }).join('')}
-      ${list.length > shown.length ? `<div class="order-foot"><button class="btn-link" data-action="open-quotes-history">Ver todos os ${list.length} orçamentos</button></div>` : ''}`;
+    if ($('#quotes-dialog').open) renderQuotesDialog();
+  }
+
+  function renderQuotesDialog() {
+    const list = openQuotesSorted();
+    const ui = lists.quotes;
+    const found = list.filter((o) => matchesQuery(o, ui.query));
+    const { items, pages, start } = pageOf(found, ui);
+    $('#quotes-dialog-count').textContent = list.length;
+    $('#quotes-dialog-list').innerHTML = !list.length
+      ? `<div class="empty empty-sm"><span class="empty-ic">${icon('file')}</span><strong>Nenhum orçamento em aberto</strong></div>`
+      : found.length
+        ? items.map(quoteRowHtml).join('') + pagerHtml('quotes', found.length, ui, pages, start, found.length === 1 ? 'orçamento' : 'orçamentos')
+        : emptySearch(ui.query);
+  }
+
+  function openQuotesDialog() {
+    const d = $('#quotes-dialog');
+    lists.quotes.page = 1;
+    $('#quotes-dialog-search').innerHTML = searchHtml('quotes', 'Pesquisar cliente, número ou item');
+    renderQuotesDialog();
+    d.showModal();
+    setTimeout(() => { const i = $('[data-search-list="quotes"]'); if (i) i.focus(); }, 0);
+  }
+
+  function renderList(name) {
+    if (name === 'orders') renderDashboard();
+    else renderQuotesDialog();
+  }
+
+  function changePage(name, dir) {
+    lists[name].page += dir;
+    renderList(name);
+    const box = name === 'orders' ? $('#dash-orders') : $('#quotes-dialog-list');
+    if (box && name === 'orders') box.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (name === 'quotes') $('#quotes-dialog').scrollTop = 0;
+  }
+
+  /* Anéis das metas no topo: mostram o andamento sem precisar rolar até as metas. */
+  function renderGoalRings() {
+    const el = $('#goal-rings');
+    if (!el) return;
+    const goals = state.goals.slice(0, 3);
+    el.hidden = !goals.length;
+    el.innerHTML = goals.map((g) => {
+      const p = goalProgress(g, state.history);
+      const pct = Math.max(0, Math.min(100, p.pct));
+      const label = pct >= 100 ? '100' : pct < 10 ? pct.toFixed(1).replace('.', ',').replace(',0', '') : Math.floor(pct);
+      const c = 2 * Math.PI * 15;
+      return `<button class="goal-ring ${p.reached ? 'reached' : ''}" data-action="goto-goals" title="${esc(g.name)}: ${label}%" aria-label="Meta ${esc(g.name)}: ${label}%">
+        <svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="15"/><circle class="ring-fill" cx="18" cy="18" r="15" stroke-dasharray="${(pct / 100) * c} ${c}"/></svg>
+        <span>${label}%</span>
+      </button>`;
+    }).join('');
   }
 
   function openGoalForm(id) {
@@ -1616,7 +1753,17 @@
       renderOrder();
       renderDashboard();
     },
-    'history-open': (b) => openHistoryOrder(b.dataset.id),
+    'history-open': (b) => {
+      const d = $('#quotes-dialog');
+      if (d.open) d.close();
+      openHistoryOrder(b.dataset.id);
+    },
+    page: (b) => changePage(b.dataset.list, Number(b.dataset.dir)),
+    'quotes-all': openQuotesDialog,
+    'goto-goals': () => {
+      if (state.tab !== 'dashboard') setTab('dashboard');
+      $('#dash-goals').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    },
     'open-quotes-history': () => { state.historyFilter = 'quote'; setTab('history'); },
     'history-del': (b) => deleteHistoryOrder(b.dataset.id),
     'order-delete': deleteOpenOrder,
@@ -1696,6 +1843,11 @@
       state.profile[el.dataset.p] = el.value;
       save();
       renderProfilePreview();
+    } else if (el.dataset.searchList) {
+      const ui = lists[el.dataset.searchList];
+      ui.query = el.value;
+      ui.page = 1;
+      renderList(el.dataset.searchList);
     } else if (el.id === 'order-client') {
       state.order.client = el.value;
       markDirty();
@@ -1710,6 +1862,13 @@
     if (el.id === 'margin-field') syncMargin();
     if (el.id === 'theme-select') setTheme(el.value);
     if (el.id === 'product-select') pickProduct(el.value);
+    if (el.dataset.perList) {
+      const ui = lists[el.dataset.perList];
+      ui.per = Number(el.value) || 10;
+      ui.page = 1;
+      saveListUi();
+      renderList(el.dataset.perList);
+    }
     if (el.id === 'order-client' || el.id === 'order-notes') renderOrder();
     if (el.id === 'currency') {
       state.currency = el.value;

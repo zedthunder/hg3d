@@ -737,3 +737,33 @@ a.btn { text-decoration: none; }
 .order-item-actions .item-product-btn { padding: 3px 8px; font-size: 12px; margin-right: 4px; }
 .order-item-actions .item-product-btn .ic { width: 14px; height: 14px; }
 .hint-box { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--panel-2); margin: 0 0 14px; }
+
+/* ---------- pesquisa e páginas ---------- */
+.search { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 300px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel-2); color: var(--faint); }
+.search:focus-within { border-color: var(--accent-edge); color: var(--accent-text); }
+.search .ic { width: 16px; height: 16px; flex: none; }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 8px 0; color: var(--text); font: inherit; font-size: 13.5px; outline: none; box-shadow: none; }
+.panel-head.wrap { flex-wrap: wrap; gap: 10px; }
+#quotes-dialog-search .search { flex-basis: auto; margin-bottom: 6px; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding: 12px 0 2px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.pager-per { display: inline-flex; align-items: center; gap: 6px; }
+.pager-per select { width: auto; padding: 4px 26px 4px 8px; font-size: 12.5px; }
+.pager-nav { display: inline-flex; align-items: center; gap: 4px; }
+.pager-nav .icon-btn:disabled { opacity: .35; cursor: default; }
+.pager-page { min-width: 92px; text-align: center; font-variant-numeric: tabular-nums; }
+.quotes-more { padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: center; }
+.modal-wide { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; }
+.modal-wide h2 { display: flex; align-items: center; gap: 8px; }
+
+/* ---------- anéis das metas no topo ---------- */
+.goal-rings { margin-left: auto; display: flex; gap: 6px; }
+.goal-rings[hidden] { display: none; }
+.goal-rings + .sync-status { margin-left: 12px; }
+.goal-ring { position: relative; width: 40px; height: 40px; padding: 0; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; border-radius: 50%; }
+.goal-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.goal-ring .ring-track { fill: none; stroke: var(--line-strong); stroke-width: 3.5; }
+.goal-ring .ring-fill { fill: none; stroke: var(--accent-edge); stroke-width: 3.5; stroke-linecap: round; transition: stroke-dasharray .4s; }
+.goal-ring.reached .ring-fill { stroke: var(--good); }
+.goal-ring span { position: relative; font-size: 10px; font-weight: 700; color: var(--text); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.goal-ring:hover .ring-track { stroke: var(--muted); }
+@media (max-width: 780px) { .search { flex-basis: 100%; } }
